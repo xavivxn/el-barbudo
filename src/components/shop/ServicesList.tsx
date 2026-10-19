@@ -16,7 +16,7 @@ export function ServicesList({ services }: { services: ServiceDTO[] }) {
             Servicios
           </h2>
           <p className="mt-4 max-w-sm text-muted">
-            Atendemos con turno y también sin turno. Reservá el tuyo por WhatsApp.
+            Elegí el servicio y te confirmamos el horario por WhatsApp.
           </p>
         </div>
 

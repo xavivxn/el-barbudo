@@ -9,7 +9,7 @@ export function AboutSection() {
         <div className="relative aspect-4/3 overflow-hidden md:col-span-6 md:aspect-4/5 lg:col-span-7">
           <SafeImage
             src={image}
-            alt="Sillón de barbero de cuero en el local"
+            alt="Sillón de barbero de cuero"
             fill
             sizes="(min-width: 768px) 55vw, 100vw"
             className="object-cover object-[center_35%]"

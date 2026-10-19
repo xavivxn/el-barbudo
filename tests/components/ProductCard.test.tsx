@@ -55,6 +55,15 @@ const soldOutProduct = product({
   variants: [{ id: "v3", label: "50 ml", price: 1650000, stock: 0 }],
 });
 
+const cheapestSoldOut = product({
+  slug: "ambar-nocturno",
+  name: "Ámbar Nocturno",
+  variants: [
+    { id: "v5", label: "50 ml", price: 450000, stock: 0 },
+    { id: "v6", label: "100 ml", price: 650000, stock: 2 },
+  ],
+});
+
 const beardOil = product({
   slug: "aceite-de-barba",
   name: "Aceite de barba",
@@ -97,6 +106,19 @@ describe("ProductCard", () => {
     expect(decodedHref(order)).toContain("• 1 × Aceite de barba — ₲ 85.000");
   });
 
+  it("si la variante más barata está agotada, muestra y pide la más barata con stock", () => {
+    render(<ProductCard product={cheapestSoldOut} />);
+
+    expect(screen.getByText("Desde ₲ 650.000")).toBeInTheDocument();
+    expect(screen.queryByText(/450\.000/)).not.toBeInTheDocument();
+    const href = screen
+      .getByRole("link", { name: /pedir ámbar nocturno por whatsapp/i })
+      .getAttribute("href");
+    expect(href).toContain(encodeURIComponent("(100 ml)"));
+    expect(href).toContain(encodeURIComponent("₲ 650.000"));
+    expect(href).not.toContain(encodeURIComponent("(50 ml)"));
+  });
+
   it("agotado: etiqueta, sin botón de pedido y con consulta por WhatsApp", () => {
     render(<ProductCard product={soldOutProduct} />);
 
@@ -105,5 +127,7 @@ describe("ProductCard", () => {
     const inquiry = screen.getByRole("link", { name: /consultar/i });
     expect(inquiry.getAttribute("href")).toContain(encodeURIComponent("¿tienen disponible"));
     expect(decodedHref(inquiry)).toContain("¿tienen disponible Oud Reserva?");
+    // Sin fotos (`images: []`): placeholder neutro dentro del enlace de imagen (aria-hidden).
+    expect(screen.getByRole("img", { name: "Sin foto", hidden: true })).toBeInTheDocument();
   });
 });

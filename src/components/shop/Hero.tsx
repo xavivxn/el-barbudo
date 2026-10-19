@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 import { Button } from "@/components/ui/Button";
-import { Reveal } from "@/components/ui/Reveal";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { whatsappUrl } from "@/lib/whatsapp";
@@ -8,6 +7,11 @@ import { site } from "@/site";
 
 export const HERO_IMAGE =
   "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=2400&q=75";
+
+/** Escalonado de la entrada: 4 pasos de 80 ms + 400 ms de animación ≈ 640 ms en total. */
+function stagger(step: number) {
+  return { animationDelay: `${step * 80}ms` };
+}
 
 /** Sobre la foto oscura el texto es claro en ambos modos: se invierten los tokens solo acá. */
 const onPhotoTokens = {
@@ -34,23 +38,20 @@ export function Hero() {
       <div aria-hidden="true" className="absolute inset-0 -z-10 bg-black/45" />
 
       <div className="mx-auto w-full max-w-6xl px-4 pb-16 md:px-8 md:pb-24">
-        <Reveal>
-          <p className="text-xs font-medium tracking-[0.16em]">PERFUMERÍA · BARBA · CABELLO</p>
-        </Reveal>
-        <Reveal delay={0.08}>
-          <h1
-            id="hero-titulo"
-            className="mt-5 max-w-3xl font-serif text-[44px] font-medium leading-[1.05] md:text-[80px]"
-          >
-            Lo esencial, bien hecho.
-          </h1>
-        </Reveal>
-        <Reveal delay={0.16}>
-          <p className="mt-5 max-w-md text-lg">
-            {site.tagline}. Cortes a tijera, barba a navaja y fragancias elegidas una por una.
-          </p>
-        </Reveal>
-        <Reveal delay={0.24} className="mt-10 flex flex-wrap gap-3">
+        <p className="animate-hero-in text-xs font-medium tracking-[0.16em]" style={stagger(0)}>
+          PERFUMERÍA · BARBA · CABELLO
+        </p>
+        <h1
+          id="hero-titulo"
+          className="mt-5 max-w-3xl animate-hero-in font-serif text-[44px] font-medium leading-[1.05] md:text-[80px]"
+          style={stagger(1)}
+        >
+          Lo esencial, bien hecho.
+        </h1>
+        <p className="mt-5 max-w-md animate-hero-in text-lg" style={stagger(2)}>
+          {site.tagline}. Cortes a tijera, barba a navaja y fragancias elegidas una por una.
+        </p>
+        <div className="mt-10 flex animate-hero-in flex-wrap gap-3" style={stagger(3)}>
           <Button href="/productos">Ver catálogo</Button>
           <Button
             variant="secondary"
@@ -61,7 +62,7 @@ export function Hero() {
             <WhatsAppIcon />
             Escribinos
           </Button>
-        </Reveal>
+        </div>
       </div>
     </section>
   );
