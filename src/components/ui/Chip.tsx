@@ -19,7 +19,7 @@ export function Chip({ href, active = false, className = "", children, ...rest }
 
   if (href) {
     return (
-      <Link href={href} className={classes} aria-current={active ? "true" : undefined}>
+      <Link href={href} className={classes} aria-current={active ? "page" : undefined}>
         {children}
       </Link>
     );
