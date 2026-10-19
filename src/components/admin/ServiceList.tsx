@@ -1,5 +1,6 @@
 "use client";
 
+import { unstable_rethrow } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { deleteService, moveService } from "@/app/admin/service-actions";
 import { ServiceForm } from "@/components/admin/ServiceForm";
@@ -10,6 +11,11 @@ import type { ServiceDTO } from "@/lib/types";
 const NEW = "new";
 const ANNOUNCE_DELAY_MS = 50;
 
+const MOVE_FAILED = "No pudimos mover el servicio. Probá de nuevo.";
+const DELETE_FAILED = "No pudimos eliminar el servicio. Probá de nuevo.";
+
+type Announcement = { text: string; tone: "ok" | "error" };
+
 const disabledLook =
   "aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-fg";
 
@@ -19,17 +25,17 @@ export function ServiceList({ services }: { services: ServiceDTO[] }) {
   /** Id del servicio que se edita, `NEW` para el formulario vacío, `null` si no hay ninguno abierto. */
   const [editing, setEditing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<ServiceDTO | null>(null);
-  const [announcement, setAnnouncement] = useState("");
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
 
   /**
    * Escribe en la región de estado. Primero la vacía y recién después pone el texto: así un mensaje
    * idéntico al anterior ("Servicio guardado" dos veces) se vuelve a anunciar.
    */
   const announceTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  function announce(text: string) {
+  function announce(text: string, tone: Announcement["tone"] = "ok") {
     clearTimeout(announceTimer.current);
-    setAnnouncement("");
-    if (text) announceTimer.current = setTimeout(() => setAnnouncement(text), ANNOUNCE_DELAY_MS);
+    setAnnouncement(null);
+    if (text) announceTimer.current = setTimeout(() => setAnnouncement({ text, tone }), ANNOUNCE_DELAY_MS);
   }
   useEffect(() => () => clearTimeout(announceTimer.current), []);
 
@@ -83,7 +89,16 @@ export function ServiceList({ services }: { services: ServiceDTO[] }) {
     if (target < 0 || target >= services.length) return;
     focusAfterMove.current = `service-${direction}-${service.id}`;
     startTransition(async () => {
-      await moveService(service.id, direction);
+      try {
+        await moveService(service.id, direction);
+      } catch (error) {
+        // Una sesión vencida redirige al login: ese error lo maneja Next.
+        unstable_rethrow(error);
+        // La lista no cambió, así que el foco sigue en el botón pulsado.
+        focusAfterMove.current = null;
+        announce(MOVE_FAILED, "error");
+        return;
+      }
       announce(`${service.name} quedó en la posición ${target + 1} de ${services.length}.`);
     });
   }
@@ -100,7 +115,17 @@ export function ServiceList({ services }: { services: ServiceDTO[] }) {
     closeReason.current = "deleted";
     dialogRef.current?.close();
     startTransition(async () => {
-      await deleteService(id);
+      try {
+        await deleteService(id);
+      } catch (error) {
+        unstable_rethrow(error);
+        // El diálogo ya está cerrado y el servicio sigue en la lista: el foco vuelve a su Eliminar.
+        const trigger = document.getElementById(`service-delete-${id}`);
+        if (trigger) trigger.focus();
+        else headingRef.current?.focus();
+        announce(DELETE_FAILED, "error");
+        return;
+      }
       announce("Servicio eliminado");
     });
   }
@@ -150,7 +175,13 @@ export function ServiceList({ services }: { services: ServiceDTO[] }) {
       {/* Siempre montada: un texto que aparece en una región ya existente se anuncia de forma fiable. */}
       <div role="status">
         {announcement ? (
-          <p className="mt-6 border border-ok bg-surface px-4 py-3 font-medium text-ok">{announcement}</p>
+          <p
+            className={`mt-6 border bg-surface px-4 py-3 font-medium ${
+              announcement.tone === "error" ? "border-danger text-danger" : "border-ok text-ok"
+            }`}
+          >
+            {announcement.text}
+          </p>
         ) : null}
       </div>
 

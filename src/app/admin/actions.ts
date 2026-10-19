@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { parsePrice, parseStock, PRICE_ERROR, STOCK_ERROR } from "@/lib/admin-messages";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -189,6 +189,8 @@ export async function saveProduct(_prev: FormState, formData: FormData): Promise
     if (productId) await updateProduct(productId, parsed.data);
     else await createProduct(parsed.data);
   } catch (error) {
+    // Un redirect/notFound de Next no es un fallo de la base: sigue su camino.
+    unstable_rethrow(error);
     if (error instanceof ProductNotFound) {
       return { message: "No encontramos este producto. Puede que ya lo hayan borrado." };
     }

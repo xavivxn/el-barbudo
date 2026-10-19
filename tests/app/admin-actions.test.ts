@@ -24,7 +24,10 @@ const redirect = vi.hoisted(() =>
     throw new Error(`NEXT_REDIRECT:${url}`);
   }),
 );
-vi.mock("next/navigation", () => ({ redirect }));
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  redirect,
+}));
 
 import { markSoldOut, saveProduct, toggleProductFlag, updateVariant } from "@/app/admin/actions";
 
@@ -250,6 +253,18 @@ describe("saveProduct", () => {
     const state = await saveProduct({}, productForm());
     expect(state.message).toBe("No pudimos guardar el producto. Probá de nuevo.");
     expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("un notFound de Next dentro de la escritura no se convierte en mensaje", async () => {
+    const { notFound } = await vi.importActual<typeof import("next/navigation")>("next/navigation");
+    let nextError: unknown;
+    try {
+      notFound();
+    } catch (error) {
+      nextError = error;
+    }
+    db.product.create.mockRejectedValue(nextError);
+    await expect(saveProduct({}, productForm())).rejects.toBe(nextError);
   });
 
   describe("editar", () => {

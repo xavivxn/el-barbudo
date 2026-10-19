@@ -13,7 +13,15 @@ import {
   useTransition,
 } from "react";
 import { type FormState, saveProduct } from "@/app/admin/actions";
-import { ErrorSummary, Field, FieldError, focusRing, inputClass, useFieldErrors } from "@/components/admin/form-parts";
+import {
+  ErrorSummary,
+  Field,
+  FieldError,
+  focusRing,
+  inputClass,
+  useFieldErrors,
+  withSaveFallback,
+} from "@/components/admin/form-parts";
 import { Button } from "@/components/ui/Button";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { isHttpsUrl, parsePrice } from "@/lib/admin-messages";
@@ -22,6 +30,8 @@ import { CATEGORIES, type Category, type ProductDTO } from "@/lib/types";
 import { fieldErrors, parseProductForm, productSchema, slugify } from "@/lib/validation";
 
 const initialState: FormState = {};
+/** Un fallo de red no tira la página: queda como mensaje y lo escrito sigue en el formulario. */
+const save = withSaveFallback(saveProduct);
 
 type Row = {
   uid: number;
@@ -110,7 +120,7 @@ function initialValues(product?: ProductDTO) {
 }
 
 export function ProductForm({ product }: { product?: ProductDTO }) {
-  const [state, formAction, pending] = useActionState(saveProduct, initialState);
+  const [state, formAction, pending] = useActionState(save, initialState);
   const [, startTransition] = useTransition();
 
   const [values, setValues] = useState(() => initialValues(product));

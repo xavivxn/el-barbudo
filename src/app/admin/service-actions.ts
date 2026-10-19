@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { fieldErrors, parseServiceForm, serviceSchema } from "@/lib/validation";
@@ -40,6 +41,8 @@ export async function saveService(_prev: FormState, formData: FormData): Promise
       });
     }
   } catch (error) {
+    // Un redirect/notFound de Next no es un fallo de la base: sigue su camino.
+    unstable_rethrow(error);
     console.error("saveService", error);
     return { message: "No pudimos guardar el servicio. Probá de nuevo." };
   }

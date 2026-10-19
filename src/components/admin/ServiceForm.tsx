@@ -12,13 +12,15 @@ import {
 } from "react";
 import type { FormState } from "@/app/admin/actions";
 import { saveService } from "@/app/admin/service-actions";
-import { ErrorSummary, Field, useFieldErrors } from "@/components/admin/form-parts";
+import { ErrorSummary, Field, useFieldErrors, withSaveFallback } from "@/components/admin/form-parts";
 import { Button } from "@/components/ui/Button";
 import { formatThousands } from "@/lib/money";
 import type { ServiceDTO } from "@/lib/types";
 import { fieldErrors, parseServiceForm, serviceSchema } from "@/lib/validation";
 
 const initialState: FormState = {};
+/** Un fallo de red no tira la página: queda como mensaje y lo escrito sigue en el formulario. */
+const save = withSaveFallback(saveService);
 
 const FIELDS = ["name", "description", "price"] as const;
 type FieldName = (typeof FIELDS)[number];
@@ -36,7 +38,7 @@ type Props = {
 };
 
 export function ServiceForm({ service, formId, onSaved, onFailed, onCancel }: Props) {
-  const [state, formAction, pending] = useActionState(saveService, initialState);
+  const [state, formAction, pending] = useActionState(save, initialState);
   const [, startTransition] = useTransition();
 
   const [values, setValues] = useState({

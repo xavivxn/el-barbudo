@@ -222,6 +222,19 @@ describe("ProductForm", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("No pudimos guardar el producto. Probá de nuevo.");
   });
 
+  it("si el pedido no llega (sin conexión) avisa y no pierde lo escrito", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    saveProduct.mockRejectedValue(new TypeError("Failed to fetch"));
+    const user = userEvent.setup();
+    render(<ProductForm />);
+    await user.type(field("Nombre"), "Aceite de cedro");
+    await user.click(screen.getByRole("button", { name: "Guardar producto" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("No pudimos guardar. Probá de nuevo.");
+    expect(field("Nombre")).toHaveValue("Aceite de cedro");
+    log.mockRestore();
+  });
+
   it("muestra miniaturas de las fotos válidas", async () => {
     const user = userEvent.setup();
     render(<ProductForm />);

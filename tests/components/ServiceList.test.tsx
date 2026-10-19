@@ -116,6 +116,54 @@ describe("orden", () => {
   });
 });
 
+describe("si la action falla", () => {
+  it("mover: avisa en la región de estado, no rompe la página y el foco sigue en el botón", async () => {
+    actions.moveService.mockRejectedValue(new Error("Failed to fetch"));
+    const user = userEvent.setup();
+    render(<ServiceList services={services} />);
+    const up = screen.getByRole("button", { name: "Subir Corte + barba" });
+    await user.click(up);
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("No pudimos mover el servicio. Probá de nuevo."),
+    );
+    expect(screen.getByRole("heading", { level: 1, name: "Servicios" })).toBeInTheDocument();
+    expect(up).toHaveFocus();
+  });
+
+  it("guardar sin conexión: el formulario sigue abierto con lo escrito y el aviso", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    actions.saveService.mockRejectedValue(new TypeError("Failed to fetch"));
+    const user = userEvent.setup();
+    render(<ServiceList services={services} />);
+    await user.click(screen.getByRole("button", { name: "Editar Corte clásico" }));
+    const price = screen.getByLabelText("Precio");
+    await user.clear(price);
+    await user.type(price, "95000");
+    await user.click(screen.getByRole("button", { name: "Guardar servicio" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("No pudimos guardar. Probá de nuevo.");
+    expect(screen.getByLabelText("Precio")).toHaveValue("95000");
+    log.mockRestore();
+  });
+
+  it("eliminar: avisa, el diálogo queda cerrado y el foco vuelve al Eliminar de esa fila", async () => {
+    actions.deleteService.mockRejectedValue(new Error("SQLITE_BUSY"));
+    const user = userEvent.setup();
+    render(<ServiceList services={services} />);
+    const trigger = screen.getByRole("button", { name: "Eliminar Corte + barba" });
+    await user.click(trigger);
+    await user.click(within(dialog()).getByRole("button", { name: "Eliminar" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("No pudimos eliminar el servicio. Probá de nuevo."),
+    );
+    expect(screen.getByRole("status")).not.toHaveTextContent("Servicio eliminado");
+    expect(dialog()).not.toHaveAttribute("open");
+    expect(trigger).toHaveFocus();
+  });
+});
+
 describe("región de estado", () => {
   async function saveFirstPrice(user: ReturnType<typeof userEvent.setup>, value: string) {
     await user.click(screen.getByRole("button", { name: "Editar Corte clásico" }));

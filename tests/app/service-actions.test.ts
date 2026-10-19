@@ -125,6 +125,18 @@ describe("saveService", () => {
     const result = await saveService({}, serviceForm({ id: "s1" }));
     expect(result).toEqual({ message: "No pudimos guardar el servicio. Probá de nuevo." });
   });
+
+  it("un notFound de Next dentro de la escritura no se convierte en mensaje", async () => {
+    const { notFound } = await vi.importActual<typeof import("next/navigation")>("next/navigation");
+    let nextError: unknown;
+    try {
+      notFound();
+    } catch (error) {
+      nextError = error;
+    }
+    db.service.updateMany.mockRejectedValue(nextError);
+    await expect(saveService({}, serviceForm({ id: "s1" }))).rejects.toBe(nextError);
+  });
 });
 
 describe("deleteService", () => {

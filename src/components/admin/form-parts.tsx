@@ -1,10 +1,33 @@
 "use client";
 
 import { CircleAlert } from "lucide-react";
+import { unstable_rethrow } from "next/navigation";
 import { type MouseEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import type { FormState } from "@/app/admin/actions";
 
 /** Piezas que comparten los formularios del admin (producto y servicio). */
+
+export const SAVE_FAILED = "No pudimos guardar. Probá de nuevo.";
+
+type FormAction = (prev: FormState, data: FormData) => Promise<FormState>;
+
+/**
+ * Envuelve la Server Action que recibe `useActionState`. Si el pedido no llega (sin conexión, el
+ * servidor cayó), la promesa se rechaza y React lleva el error al boundary: se perdería lo escrito.
+ * Así se convierte en un mensaje del formulario. Los redirect/notFound de Next (guardado con éxito,
+ * sesión vencida) se vuelven a lanzar para que Next los maneje.
+ */
+export function withSaveFallback(action: FormAction): FormAction {
+  return async (prev, data) => {
+    try {
+      return await action(prev, data);
+    } catch (error) {
+      unstable_rethrow(error);
+      console.error(error);
+      return { message: SAVE_FAILED };
+    }
+  };
+}
 
 export const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
