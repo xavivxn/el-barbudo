@@ -42,10 +42,21 @@
 
 @theme {
   --animate-page-in: page-in 200ms ease-out;
+  /* Barra de la vitrina: dura lo mismo que el intervalo de auto-avance (Showcase). */
+  --animate-showcase-progress: showcase-progress 6s linear both;
 
   @keyframes page-in {
     from {
       opacity: 0;
+    }
+  }
+
+  @keyframes showcase-progress {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
     }
   }
 }

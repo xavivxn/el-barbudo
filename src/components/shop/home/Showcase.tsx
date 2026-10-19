@@ -1,0 +1,394 @@
+"use client";
+
+import { ArrowLeft, ArrowRight, Pause, Play } from "lucide-react";
+import { type MotionValue, motion, useScroll, useTransform } from "motion/react";
+import {
+  type CSSProperties,
+  type FocusEvent,
+  type KeyboardEvent,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { flushSync } from "react-dom";
+import { Button } from "@/components/ui/Button";
+import { SafeImage } from "@/components/ui/SafeImage";
+import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
+import { cardPricing } from "@/lib/pricing";
+import { wrapIndex } from "@/lib/showcase";
+import { toneFor } from "@/lib/tone";
+import type { ProductDTO } from "@/lib/types";
+
+/** Intervalo de auto-avance; la barra de progreso (`animate-showcase-progress`) dura lo mismo. */
+const INTERVAL_MS = 6000;
+/** Espera tras el último evento de scroll para leer en qué diapositiva quedó el swipe. */
+const SCROLL_SETTLE_MS = 120;
+const PARALLAX_PX = 24;
+/** Alto del área de la foto; el brillo del tono usa el mismo para quedar justo detrás. */
+const IMAGE_AREA_HEIGHT = "h-[38svh] min-h-60 md:h-[520px]";
+const IMAGE_SIZES = "(min-width: 1024px) 336px, (min-width: 768px) 272px, 60vw";
+
+const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+// Sin `display`: cada botón pone el suyo (las flechas van `hidden md:inline-flex`).
+const controlButton = `h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line text-fg transition-colors duration-200 hover:border-fg hover:bg-fg hover:text-bg ${focusRing}`;
+
+// En móvil los dos CTA comparten una fila de ~150 px cada uno: menos padding que el `md` del Button
+// (con `!`, porque la clase de tamaño del Button gana por orden en el CSS).
+const ctaFit = "gap-1.5! px-3! whitespace-nowrap md:gap-2! md:px-5! lg:px-7!";
+
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+
+function subscribeReducedMotion(onChange: () => void) {
+  const query = window.matchMedia(REDUCED_MOTION);
+  query.addEventListener?.("change", onChange);
+  return () => query.removeEventListener?.("change", onChange);
+}
+
+function usePrefersReducedMotion() {
+  return useSyncExternalStore(
+    subscribeReducedMotion,
+    () => window.matchMedia(REDUCED_MOTION).matches,
+    () => false,
+  );
+}
+
+function subscribeVisibility(onChange: () => void) {
+  document.addEventListener("visibilitychange", onChange);
+  return () => document.removeEventListener("visibilitychange", onChange);
+}
+
+function useDocumentHidden() {
+  return useSyncExternalStore(subscribeVisibility, () => document.hidden, () => false);
+}
+
+const subscribeNothing = () => () => {};
+
+/** `false` en el HTML del servidor y durante la hidratación; `true` una vez que hay JS. */
+function useHydrated() {
+  return useSyncExternalStore(subscribeNothing, () => true, () => false);
+}
+
+type ShowcaseProps = {
+  /** La salida de `pickShowcase`. */
+  products: ProductDTO[];
+};
+
+export function Showcase({ products }: ShowcaseProps) {
+  if (products.length === 0) return null;
+  return <ShowcaseCarousel products={products} />;
+}
+
+function ShowcaseCarousel({ products }: ShowcaseProps) {
+  const count = products.length;
+  const sectionRef = useRef<HTMLElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const settleTimer = useRef<number | undefined>(undefined);
+
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focusedWithin, setFocusedWithin] = useState(false);
+  const reducedMotion = usePrefersReducedMotion();
+  const hidden = useDocumentHidden();
+  // Sin JS todas las diapositivas quedan usables con scroll-snap; `inert` llega con la hidratación.
+  const hydrated = useHydrated();
+
+  const playing = count > 1 && !reducedMotion && !paused && !hovered && !focusedWithin && !hidden;
+
+  // Parallax leve de la foto mientras la vitrina cruza la pantalla (nunca con reduced motion).
+  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start end", "end start"] });
+  const parallaxY = useTransform(scrollYProgress, [0, 1], [PARALLAX_PX, -PARALLAX_PX]);
+
+  function goTo(target: number, { moveFocus = false } = {}) {
+    const next = wrapIndex(target, count);
+    const track = trackRef.current;
+    track?.scrollTo({ left: next * track.clientWidth, behavior: reducedMotion ? "auto" : "smooth" });
+    if (!moveFocus) {
+      setActive(next);
+      return;
+    }
+    // El foco estaba en la diapositiva que se vuelve inert: pasa a la nueva para no perderse.
+    flushSync(() => setActive(next));
+    slideRefs.current[next]?.focus({ preventScroll: true });
+  }
+
+  const advance = useEffectEvent(() => goTo(active + 1));
+
+  useEffect(() => {
+    if (!playing) return;
+    const id = window.setInterval(() => advance(), INTERVAL_MS);
+    return () => window.clearInterval(id);
+    // `active` reinicia el intervalo: tras un swipe o un clic, la diapositiva nueva dura 6 s enteros.
+  }, [playing, active]);
+
+  useEffect(() => () => window.clearTimeout(settleTimer.current), []);
+
+  function onTrackScroll() {
+    window.clearTimeout(settleTimer.current);
+    settleTimer.current = window.setTimeout(() => {
+      const track = trackRef.current;
+      if (!track || track.clientWidth === 0) return;
+      setActive(wrapIndex(Math.round(track.scrollLeft / track.clientWidth), count));
+    }, SCROLL_SETTLE_MS);
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (count < 2 || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
+    // Alt/Cmd + flecha es "atrás/adelante" del navegador: no se intercepta.
+    if (event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return;
+    event.preventDefault();
+    const fromSlide = slideRefs.current.some((slide) => slide?.contains(event.target as Node));
+    goTo(active + (event.key === "ArrowRight" ? 1 : -1), { moveFocus: fromSlide });
+  }
+
+  function onFocus(event: FocusEvent<HTMLElement>) {
+    // Solo cuando el foco entra desde afuera: moverse adentro no vuelve a pausar tras "Reanudar".
+    if (!event.currentTarget.contains(event.relatedTarget)) setFocusedWithin(true);
+  }
+
+  function onBlur(event: FocusEvent<HTMLElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget)) setFocusedWithin(false);
+  }
+
+  function togglePaused() {
+    if (paused) {
+      // Reanudar es explícito: vuelve a girar aunque el foco siga en el botón (patrón WAI-ARIA).
+      setPaused(false);
+      setFocusedWithin(false);
+    } else {
+      setPaused(true);
+    }
+  }
+
+  return (
+    <section
+      ref={sectionRef}
+      aria-roledescription="carrusel"
+      aria-label="Destacados"
+      onKeyDown={onKeyDown}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      onPointerEnter={(event) => event.pointerType === "mouse" && setHovered(true)}
+      onPointerLeave={(event) => event.pointerType === "mouse" && setHovered(false)}
+      className="relative isolate overflow-hidden rounded-2xl border border-line bg-surface md:rounded-3xl"
+    >
+      {/*
+        Brillo del tono de cada producto, justo detrás del área de la foto (arriba en móvil, a la
+        derecha en desktop). Se apaga antes de los bordes de esa área: el texto nunca queda encima del
+        tono y mantiene el contraste de la superficie. El activo aparece con un fundido continuo.
+      */}
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-x-0 top-0 -z-10 md:left-1/2 ${IMAGE_AREA_HEIGHT}`}
+      >
+        {products.map((product, index) => {
+          const tone = toneFor(product);
+          return (
+            <div
+              key={product.id}
+              style={{ "--tone-light": tone.light, "--tone-dark": tone.dark } as CSSProperties}
+              className={`absolute inset-0 bg-[radial-gradient(closest-side,var(--tone)_0%,var(--tone)_50%,transparent_100%)] transition-opacity duration-400 ease-out [--tone:var(--tone-light)] dark:[--tone:var(--tone-dark)] ${
+                index === active ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          );
+        })}
+      </div>
+
+      <div
+        ref={trackRef}
+        onScroll={onTrackScroll}
+        aria-live={playing ? "off" : "polite"}
+        className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {products.map((product, index) => (
+          <Slide
+            key={product.id}
+            ref={(node) => {
+              slideRefs.current[index] = node;
+            }}
+            product={product}
+            index={index}
+            count={count}
+            active={index === active}
+            inert={hydrated && index !== active}
+            parallaxY={reducedMotion ? undefined : parallaxY}
+          />
+        ))}
+      </div>
+
+      {count > 1 ? (
+        <div className="flex items-center gap-3 px-4 pb-3 md:px-12 md:pb-5">
+          <div className="flex flex-1 items-center gap-2">
+            {products.map((product, index) => {
+              const current = index === active;
+              return (
+                <button
+                  key={product.id}
+                  type="button"
+                  aria-label={`Ir al destacado ${index + 1}`}
+                  aria-current={current ? "true" : undefined}
+                  onClick={() => goTo(index)}
+                  className={`group/bar relative h-11 min-w-6 flex-1 cursor-pointer md:max-w-20 ${focusRing}`}
+                >
+                  <span className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 overflow-hidden rounded-full bg-fg/15 transition-colors duration-200 group-hover/bar:bg-fg/35">
+                    <span
+                      // Una animación nueva por cada vuelta: al cambiar de diapositiva o al reanudar arranca de cero.
+                      key={current && playing ? `run-${active}` : "idle"}
+                      className={`block h-full origin-left bg-fg ${
+                        current ? (playing ? "animate-showcase-progress" : "scale-x-100") : "scale-x-0"
+                      }`}
+                    />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {reducedMotion ? null : (
+            <button
+              type="button"
+              aria-label={paused ? "Reanudar" : "Pausar"}
+              onClick={togglePaused}
+              className={`${controlButton} inline-flex`}
+            >
+              {paused ? <Play size={18} aria-hidden="true" /> : <Pause size={18} aria-hidden="true" />}
+            </button>
+          )}
+          <button
+            type="button"
+            aria-label="Anterior"
+            onClick={() => goTo(active - 1)}
+            className={`${controlButton} hidden md:inline-flex`}
+          >
+            <ArrowLeft size={18} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            aria-label="Siguiente"
+            onClick={() => goTo(active + 1)}
+            className={`${controlButton} hidden md:inline-flex`}
+          >
+            <ArrowRight size={18} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+type SlideProps = {
+  ref: (node: HTMLDivElement | null) => void;
+  product: ProductDTO;
+  index: number;
+  count: number;
+  active: boolean;
+  inert: boolean;
+  parallaxY: MotionValue<number> | undefined;
+};
+
+function Slide({ ref, product, index, count, active, inert, parallaxY }: SlideProps) {
+  const { soldOut, label: price, orderHref } = cardPricing(product);
+  const line = product.notes?.top ? `Salida: ${product.notes.top}` : product.description || product.subtitle;
+  const tags = product.tags.slice(0, 2);
+
+  return (
+    <div
+      ref={ref}
+      role="group"
+      aria-roledescription="diapositiva"
+      aria-label={`${index + 1} de ${count}`}
+      inert={inert}
+      tabIndex={-1}
+      className="grid min-h-[70svh] w-full shrink-0 snap-center grid-rows-[auto_1fr] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:h-[520px] md:min-h-0 md:grid-cols-2 md:grid-rows-1"
+    >
+      <div className="@container flex min-w-0 flex-col px-4 pt-4 pb-5 md:justify-center md:py-10 md:pr-6 md:pl-12 lg:pl-16">
+        <p className="text-xs font-medium tracking-[0.2em] text-muted uppercase">
+          Destacado
+          {count > 1 ? (
+            <span aria-hidden="true" className="tabular-nums">
+              {" · "}
+              {index + 1}/{count}
+            </span>
+          ) : null}
+        </p>
+        <h2 className="mt-2 font-serif text-[32px] leading-[1.05] font-medium text-balance md:mt-3 md:text-[44px] lg:text-[56px]">
+          {product.name}
+        </h2>
+
+        {tags.length > 0 ? (
+          <ul className="mt-3 flex flex-wrap gap-2 md:mt-4" aria-label="Estilo">
+            {tags.map((tag) => (
+              <li
+                key={tag}
+                className="rounded-full border border-fg/20 px-3 py-1 text-sm leading-none first-letter:uppercase"
+              >
+                {tag}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        {line ? <p className="mt-3 line-clamp-2 max-w-md text-muted md:mt-4">{line}</p> : null}
+
+        <div className="mt-4 flex items-center gap-3 md:mt-6">
+          {price ? <p className="text-xl font-medium tabular-nums">{price}</p> : null}
+          {soldOut ? (
+            <span className="rounded-full bg-fg px-3 py-1 text-xs font-medium tracking-[0.16em] text-bg uppercase">
+              Agotado
+            </span>
+          ) : null}
+        </div>
+
+        {/* Los dos CTA comparten fila si entran (~150 px c/u); en pantallas más angostas se apilan. */}
+        <div
+          className={`mt-auto grid grid-cols-1 gap-2 pt-5 md:mt-8 md:flex md:flex-wrap md:pt-0 ${
+            soldOut ? "" : "@min-[19rem]:grid-cols-2"
+          }`}
+        >
+          <Button
+            variant="accent"
+            href={orderHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={ctaFit}
+          >
+            <WhatsAppIcon />
+            {soldOut ? "Consultar disponibilidad" : "Pedir ahora"}
+            <span className="sr-only"> {product.name} por WhatsApp</span>
+          </Button>
+          <Button
+            variant="secondary"
+            href={`/productos/${product.slug}`}
+            className={ctaFit}
+          >
+            Ver producto
+          </Button>
+        </div>
+      </div>
+
+      {/* Decorativa: el nombre ya está en el h2. Sin foto, el placeholder se anuncia "Sin foto". */}
+      <div className={`relative order-first flex items-center justify-center md:order-none ${IMAGE_AREA_HEIGHT}`}>
+        <motion.div style={parallaxY ? { y: parallaxY } : undefined} className="relative h-[86%] md:h-[340px] lg:h-[420px]">
+          <div
+            className={`relative aspect-4/5 h-full overflow-hidden rounded-2xl bg-surface shadow-[0_24px_48px_-24px_rgb(20_20_20/0.45)] transition-transform duration-400 ease-out ${
+              active ? "-rotate-3 scale-100" : "rotate-0 scale-[0.92]"
+            }`}
+          >
+            <SafeImage
+              src={product.images[0]}
+              alt=""
+              fill
+              preload={index === 0}
+              sizes={IMAGE_SIZES}
+              className={`object-cover ${soldOut ? "opacity-60" : ""}`}
+            />
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  );
+}
