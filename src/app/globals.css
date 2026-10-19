@@ -39,19 +39,10 @@
 
 @theme {
   --animate-page-in: page-in 200ms ease-out;
-  /* Entrada del hero en CSS puro: corre sin JS y la neutraliza la regla de reduced-motion. */
-  --animate-hero-in: hero-in 400ms ease-out both;
 
   @keyframes page-in {
     from {
       opacity: 0;
-    }
-  }
-
-  @keyframes hero-in {
-    from {
-      opacity: 0;
-      transform: translateY(12px);
     }
   }
 }
@@ -104,7 +95,7 @@ body {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
-    /* Sin esto, el escalonado del hero (animation-delay en línea) dejaría texto oculto unos ms. */
+    /* Sin esto, una animación con animation-delay dejaría contenido oculto unos ms. */
     animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

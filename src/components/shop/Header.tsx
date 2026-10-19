@@ -4,7 +4,6 @@ import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { CSSProperties } from "react";
 import { CartButton } from "@/components/shop/CartButton";
 import { Logo } from "@/components/ui/Logo";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -16,14 +15,15 @@ const NAV = [
     label: c.label,
     href: `/productos?categoria=${c.slug}`,
   })),
-  { key: "servicios", label: "Servicios", href: "/#servicios" },
+  { key: "barberia", label: "La barbería", href: "/barberia" },
 ];
 
-/** Sobre el hero el header es transparente: se redefinen los tokens de texto solo dentro de él. */
-const overHeroTokens = {
-  "--fg": "#F2EFE9",
-  "--surface": "rgba(242, 239, 233, 0.16)",
-} as CSSProperties;
+/** Ítem activo: la categoría filtrada en el catálogo o la página de la barbería. */
+function currentKey(pathname: string, categoria: string | null): string | null {
+  if (pathname === "/barberia") return "barberia";
+  if (pathname === "/productos") return categoria;
+  return null;
+}
 
 function useScrolledPast(px: number) {
   return useSyncExternalStore(
@@ -70,24 +70,20 @@ function NavLinks({ current, variant, onNavigate }: NavLinksProps) {
 function ActiveNavLinks(props: Omit<NavLinksProps, "current">) {
   const pathname = usePathname();
   const params = useSearchParams();
-  const current = pathname === "/productos" ? params.get("categoria") : null;
-  return <NavLinks current={current} {...props} />;
+  return <NavLinks current={currentKey(pathname, params.get("categoria"))} {...props} />;
 }
 
 function Nav(props: Omit<NavLinksProps, "current">) {
+  const pathname = usePathname();
   return (
-    <Suspense fallback={<NavLinks current={null} {...props} />}>
+    <Suspense fallback={<NavLinks current={currentKey(pathname, null)} {...props} />}>
       <ActiveNavLinks {...props} />
     </Suspense>
   );
 }
 
 export function Header() {
-  const pathname = usePathname();
-  const overHero = pathname === "/";
-  const pastHero = useScrolledPast(80);
   const scrolled = useScrolledPast(0);
-  const transparent = overHero && !pastHero;
 
   const dialogRef = useRef<HTMLDialogElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -119,11 +115,8 @@ export function Header() {
   return (
     <>
       <header
-        style={transparent ? overHeroTokens : undefined}
-        className={`sticky top-0 z-40 h-14 border-b text-fg transition-colors duration-200 ${
-          overHero ? "-mb-14" : ""
-        } ${transparent ? "border-transparent bg-transparent" : "bg-bg"} ${
-          !transparent && scrolled ? "border-line" : "border-transparent"
+        className={`sticky top-0 z-40 h-14 border-b bg-bg text-fg transition-colors duration-200 ${
+          scrolled ? "border-line" : "border-transparent"
         }`}
       >
         <div className="mx-auto flex h-full max-w-6xl items-center gap-2 px-4 md:gap-4 md:px-8">
@@ -132,7 +125,7 @@ export function Header() {
             aria-label="El Barbudo, inicio"
             className="flex shrink-0 items-center gap-2 md:gap-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            <Logo variant="mark" tone={transparent ? "light" : "auto"} />
+            <Logo variant="mark" />
             <span className="font-serif text-lg font-semibold tracking-[0.16em] md:text-xl md:tracking-[0.22em]">
               EL BARBUDO
             </span>
