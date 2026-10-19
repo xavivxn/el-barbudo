@@ -39,6 +39,8 @@
 
 html {
   color-scheme: light;
+  /* Alto del header sticky (56px) + aire: lo enfocado o anclado nunca queda tapado. */
+  scroll-padding-top: 4.5rem;
 }
 
 html.dark {
@@ -51,6 +53,17 @@ body {
   font-family: var(--font-inter), system-ui, sans-serif;
   font-size: 1rem;
   line-height: 1.5;
+}
+
+@keyframes menu-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+.menu-sheet[open] {
+  animation: menu-sheet-in 200ms ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

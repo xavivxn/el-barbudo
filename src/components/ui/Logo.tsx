@@ -2,19 +2,25 @@ import Image from "next/image";
 
 type LogoProps = {
   variant?: "mark" | "full";
+  /** `light` usa logo-light.png (trazo claro, fondo transparente) para ir sobre una foto oscura. */
+  tone?: "auto" | "light";
   className?: string;
 };
 
 // logo.jpg es negro sobre blanco: se mezcla con el fondo en claro y se invierte en oscuro.
-const blend = "mix-blend-multiply dark:invert dark:mix-blend-screen";
+const blendAuto = "mix-blend-multiply dark:invert dark:mix-blend-screen";
 
-export function Logo({ variant = "full", className = "" }: LogoProps) {
+export function Logo({ variant = "full", tone = "auto", className = "" }: LogoProps) {
+  // En `light` el PNG ya trae transparencia: no hay que mezclar con el fondo.
+  const light = tone === "light";
+  const blend = light ? "" : blendAuto;
+  const src = light ? "/logo-light.png" : "/logo.jpg";
   if (variant === "mark") {
     // Recorta solo la barba: imagen ampliada y anclada arriba, sin el wordmark.
     return (
       <span className={`relative inline-block h-10 w-10 shrink-0 overflow-hidden ${className}`}>
         <Image
-          src="/logo.jpg"
+          src={src}
           alt="El Barbudo"
           width={150}
           height={150}
@@ -27,7 +33,7 @@ export function Logo({ variant = "full", className = "" }: LogoProps) {
 
   return (
     <Image
-      src="/logo.jpg"
+      src={src}
       alt="El Barbudo"
       width={150}
       height={150}

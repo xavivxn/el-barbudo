@@ -94,7 +94,11 @@ export const useCart = create<CartState>()(
     }),
     {
       name: "elbarbudo-cart",
-      storage: createJSONStorage(() => localStorage),
+      // En el servidor (SSR/build) no hay localStorage: createJSONStorage atrapa el error y deja el store sin persistir.
+      storage: createJSONStorage(() => {
+        if (typeof window === "undefined") throw new Error("localStorage no disponible");
+        return localStorage;
+      }),
       partialize: (state) => ({ items: state.items }),
     },
   ),
