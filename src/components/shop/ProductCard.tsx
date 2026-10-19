@@ -1,18 +1,22 @@
 import Link from "next/link";
+import { focusRing } from "@/components/ui/focus";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { cardPricing } from "@/lib/pricing";
 import type { ProductDTO } from "@/lib/types";
 
-const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+/** Grilla de 2/3/4 columnas: catálogo y pestañas de la portada. */
+const GRID_SIZES = "(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw";
 
 type ProductCardProps = {
   product: ProductDTO;
   /** Nivel del título según el contexto: h3 bajo una sección (h2), h2 directo bajo el h1 del catálogo. */
   headingLevel?: 2 | 3;
+  /** `sizes` de la foto; por defecto, el de la grilla. Un riel de ancho fijo pasa el suyo. */
+  sizes?: string;
 };
 
-export function ProductCard({ product, headingLevel = 3 }: ProductCardProps) {
+export function ProductCard({ product, headingLevel = 3, sizes = GRID_SIZES }: ProductCardProps) {
   const Heading = headingLevel === 2 ? "h2" : "h3";
   const href = `/productos/${product.slug}`;
   const { soldOut, label: price, orderHref, orderVariant: cheapest } = cardPricing(product);
@@ -31,7 +35,7 @@ export function ProductCard({ product, headingLevel = 3 }: ProductCardProps) {
             src={product.images[0]}
             alt=""
             fill
-            sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
+            sizes={sizes}
             className={`object-cover transition-transform duration-300 group-hover:scale-105 ${
               soldOut ? "opacity-50" : ""
             }`}

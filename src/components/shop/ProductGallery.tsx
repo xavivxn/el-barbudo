@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { SafeImage } from "@/components/ui/SafeImage";
+import { usePrefersReducedMotion } from "@/lib/hooks/usePrefersReducedMotion";
 
 type ProductGalleryProps = {
   images: string[];
@@ -33,13 +34,13 @@ export function ProductGallery({ images, name }: ProductGalleryProps) {
 function MultiImageGallery({ images, name }: ProductGalleryProps) {
   const stripRef = useRef<HTMLUListElement>(null);
   const [active, setActive] = useState(0);
+  const reducedMotion = usePrefersReducedMotion();
 
   function show(index: number) {
     const strip = stripRef.current;
     setActive(index);
     if (!strip) return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    strip.scrollTo({ left: index * strip.clientWidth, behavior: reduced ? "auto" : "smooth" });
+    strip.scrollTo({ left: index * strip.clientWidth, behavior: reducedMotion ? "auto" : "smooth" });
   }
 
   function onScroll() {
