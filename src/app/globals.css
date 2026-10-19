@@ -74,6 +74,20 @@ body {
   line-height: 1.5;
 }
 
+/*
+ * Barra fija de compra en móvil (ProductPurchase): se reserva su alto al final del documento para
+ * que no tape el footer, y el foco que se mueve con Tab nunca queda escondido debajo de ella.
+ */
+@media (max-width: 767px) {
+  html:has([data-sticky-buy]) {
+    scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  body:has([data-sticky-buy]) {
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  }
+}
+
 @keyframes menu-sheet-in {
   from {
     opacity: 0;
