@@ -90,10 +90,32 @@ body {
   animation: menu-sheet-in 200ms ease-out;
 }
 
+/* Drawer del carrito: entra desde la derecha. Es una animación CSS para que la regla de reduced-motion la anule. */
+@keyframes cart-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes cart-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.cart-drawer[open] {
+  animation: cart-drawer-in 250ms ease-out;
+}
+
+.cart-drawer[open]::backdrop {
+  animation: cart-backdrop-in 250ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
-  *::after {
+  *::after,
+  *::backdrop {
     animation-duration: 0.01ms !important;
     /* Sin esto, una animación con animation-delay dejaría contenido oculto unos ms. */
     animation-delay: 0s !important;

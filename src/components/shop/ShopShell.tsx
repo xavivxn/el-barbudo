@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { CartDrawer } from "@/components/shop/CartDrawer";
 import { Footer } from "@/components/shop/Footer";
 import { Header } from "@/components/shop/Header";
 
@@ -17,7 +18,7 @@ export function ShopShell({ children }: { children: ReactNode }) {
         {children}
       </main>
       <Footer />
-      {/* Aquí se monta CartDrawer en la Task 9. */}
+      <CartDrawer />
     </div>
   );
 }
