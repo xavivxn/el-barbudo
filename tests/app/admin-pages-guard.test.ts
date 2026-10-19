@@ -7,6 +7,9 @@ vi.mock("@/lib/auth", () => ({ requireAdmin }));
 const products = vi.hoisted(() => ({ listProducts: vi.fn(), getProductById: vi.fn() }));
 vi.mock("@/lib/products", () => products);
 
+const services = vi.hoisted(() => ({ listServices: vi.fn() }));
+vi.mock("@/lib/services", () => services);
+
 vi.mock("@/lib/db", () => ({ prisma: {} }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn(),
@@ -18,6 +21,7 @@ vi.mock("next/navigation", () => ({
 import EditProductPage from "@/app/admin/(panel)/productos/[id]/page";
 import NewProductPage from "@/app/admin/(panel)/productos/nuevo/page";
 import AdminProductsPage from "@/app/admin/(panel)/page";
+import AdminServicesPage from "@/app/admin/(panel)/servicios/page";
 
 const NO_SESSION = new Error("NEXT_REDIRECT:/admin/login");
 
@@ -33,10 +37,12 @@ describe("las páginas del panel piden sesión antes de leer datos", () => {
     ["panel de productos", () => AdminProductsPage({ searchParams: Promise.resolve({}) })],
     ["producto nuevo", () => NewProductPage()],
     ["editar producto", () => EditProductPage({ params: Promise.resolve({ id: "p1" }) })],
+    ["servicios", () => AdminServicesPage()],
   ])("%s", async (_name, render) => {
     await expect(render()).rejects.toBe(NO_SESSION);
     expect(requireAdmin).toHaveBeenCalledTimes(1);
     expect(products.listProducts).not.toHaveBeenCalled();
     expect(products.getProductById).not.toHaveBeenCalled();
+    expect(services.listServices).not.toHaveBeenCalled();
   });
 });

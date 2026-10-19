@@ -12,7 +12,8 @@ import {
   type ProductInput,
 } from "@/lib/validation";
 
-export type FormState = { errors?: Record<string, string>; message?: string };
+/** `saved` lo usan los formularios que se cierran solos al guardar (servicios), sin redirigir. */
+export type FormState = { errors?: Record<string, string>; message?: string; saved?: boolean };
 
 const SLUG_TAKEN = "Ya existe un producto con esta dirección.";
 

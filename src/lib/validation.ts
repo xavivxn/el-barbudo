@@ -25,6 +25,7 @@ const MSG = {
   variants: "Agregá al menos una variante.",
   images: "Cada foto tiene que ser una URL que empiece con https://",
   notes: "Completá las tres notas o dejalas todas vacías.",
+  serviceName: "Escribí el nombre del servicio.",
 } as const;
 
 const tooLong = (max: number) => `Escribí hasta ${max} caracteres.`;
@@ -156,6 +157,19 @@ export const productSchema = z
 
 export type ProductInput = z.output<typeof productSchema>;
 
+/**
+ * Servicio de la barbería. El precio sigue la misma regla que el de las variantes (`parsePrice`) y
+ * el orden es un entero de 0 en adelante (`parseStock` ya es esa regla).
+ */
+export const serviceSchema = z.object({
+  name: required(MSG.serviceName, 120),
+  description: text.refine((value) => value.length <= 500, { error: tooLong(500) }),
+  price: amount(PRICE_ERROR, parsePrice),
+  order: amount(STOCK_ERROR, parseStock),
+});
+
+export type ServiceInput = z.output<typeof serviceSchema>;
+
 /** Primer mensaje por campo; las claves siguen el nombre del campo (`variants.0.price`). */
 export function fieldErrors(
   result: { success: boolean; error?: { issues: { path: PropertyKey[]; message: string }[] } },
@@ -199,4 +213,14 @@ export function parseProductForm(formData: FormData): Record<string, unknown> {
   }
   result.variants = [...byIndex.entries()].sort(([a], [b]) => a - b).map(([, row]) => row);
   return result;
+}
+
+/** Campos del formulario de servicio como texto; lo que no se conoce se ignora. */
+export function parseServiceForm(formData: FormData): Record<string, string> {
+  return {
+    name: str(formData.get("name")),
+    description: str(formData.get("description")),
+    price: str(formData.get("price")),
+    order: str(formData.get("order")) || "0",
+  };
 }

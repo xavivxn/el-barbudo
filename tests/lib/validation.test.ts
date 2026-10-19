@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fieldErrors, parseProductForm, productSchema, slugify } from "@/lib/validation";
+import { fieldErrors, parseProductForm, parseServiceForm, productSchema, serviceSchema, slugify } from "@/lib/validation";
 
 type Variant = { id?: string; label: string; price: string; stock: string };
 
@@ -320,5 +320,54 @@ describe("parseProductForm", () => {
       expect(result.data.benefits).toEqual(["Hidrata", "Suaviza"]);
       expect(result.data.active).toBe(true);
     }
+  });
+});
+
+describe("serviceSchema", () => {
+  const service = (over: Record<string, unknown> = {}) => ({
+    name: "Corte clásico",
+    description: "",
+    price: "80.000",
+    order: "1",
+    ...over,
+  });
+
+  it("lee el precio como lo escribe el admin y el orden como entero", () => {
+    const result = serviceSchema.safeParse(service());
+    expect(result.success && result.data).toMatchObject({ name: "Corte clásico", description: "", price: 80000, order: 1 });
+  });
+
+  it("recorta espacios y acepta una descripción", () => {
+    const result = serviceSchema.safeParse(service({ name: "  Corte + barba ", description: " Con toalla caliente ", price: " 120 000 " }));
+    expect(result.success && result.data).toMatchObject({ name: "Corte + barba", description: "Con toalla caliente", price: 120000 });
+  });
+
+  it("nombre vacío y precio inválido dan el error junto al campo", () => {
+    expect(fieldErrors(serviceSchema.safeParse(service({ name: "", price: "abc" })))).toMatchObject({
+      name: "Escribí el nombre del servicio.",
+      price: "Ingresá un precio en guaraníes, sin decimales.",
+    });
+  });
+
+  it.each(["0", "-5", "12,5", ""])("rechaza el precio %j", (price) => {
+    expect(fieldErrors(serviceSchema.safeParse(service({ price })))).toHaveProperty("price");
+  });
+
+  it.each(["-1", "1,5", "abc", ""])("rechaza el orden %j", (order) => {
+    expect(fieldErrors(serviceSchema.safeParse(service({ order })))).toHaveProperty("order");
+  });
+
+  it("limita el largo del nombre y de la descripción", () => {
+    const errors = fieldErrors(serviceSchema.safeParse(service({ name: "a".repeat(121), description: "b".repeat(501) })));
+    expect(errors.name).toBe("Escribí hasta 120 caracteres.");
+    expect(errors.description).toBe("Escribí hasta 500 caracteres.");
+  });
+
+  it("parseServiceForm lee solo los campos conocidos y asume orden 0 si falta", () => {
+    const data = new FormData();
+    data.append("name", "Afeitado");
+    data.append("price", "50.000");
+    data.append("extra", "x");
+    expect(parseServiceForm(data)).toEqual({ name: "Afeitado", description: "", price: "50.000", order: "0" });
   });
 });
