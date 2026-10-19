@@ -84,8 +84,11 @@ describe("CartDrawer", () => {
 
     render(<CartDrawer />);
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      /Ajustamos la cantidad de Noir Intense[\s\S]*Ya no está disponible: Producto borrado/,
+    // La región role="status" está siempre montada: se espera a que reciba el texto.
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        /Ajustamos la cantidad de Noir Intense[\s\S]*Ya no está disponible: Producto borrado/,
+      ),
     );
     expect(refresh).toHaveBeenCalledWith(["noir-100", "gone"]);
     expect(useCart.getState().items).toHaveLength(1);
@@ -109,11 +112,14 @@ describe("CartDrawer", () => {
 
     render(<CartDrawer />);
 
-    const status = await screen.findByRole("status");
-    expect(status.textContent).toBe("Ajustamos la cantidad de Noir Intense por stock.");
+    const status = screen.getByRole("status");
+    await waitFor(() =>
+      expect(status.textContent).toBe("Ajustamos la cantidad de Noir Intense por stock."),
+    );
 
     await user.click(screen.getByRole("button", { name: "Cerrar" }));
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    // Con el <dialog> cerrado la región queda fuera del árbol accesible: se consulta con hidden.
+    expect(screen.getByRole("status", { hidden: true })).toBeEmptyDOMElement();
   });
 
   it("carrito vacío: titular, enlace al catálogo y sin botón de WhatsApp", () => {
@@ -127,6 +133,18 @@ describe("CartDrawer", () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
+  it("si el ajuste vacía el carrito, el aviso explica por qué", async () => {
+    refresh.mockResolvedValue([snap("v1", { available: false })]);
+    useCart.setState({ items: [item({ name: "Cera" })], isOpen: true });
+
+    render(<CartDrawer />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Ya no está disponible: Cera."),
+    );
+    expect(screen.getByRole("heading", { name: "Tu carrito está vacío" })).toBeInTheDocument();
+  });
+
   it("si el refresco falla conserva el carrito y no muestra avisos", async () => {
     refresh.mockRejectedValue(new Error("red caída"));
     useCart.setState({ items: [noirQty3, borrado], isOpen: true });
@@ -136,7 +154,7 @@ describe("CartDrawer", () => {
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     await act(async () => {});
     expect(useCart.getState().items).toHaveLength(2);
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
     expect(screen.getByText("Producto borrado")).toBeInTheDocument();
   });
 

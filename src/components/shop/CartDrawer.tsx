@@ -151,17 +151,20 @@ export function CartDrawer() {
           </button>
         </div>
 
+        {/* Siempre montado: un aviso que aparece en una región ya existente se anuncia de forma fiable,
+            y se ve también si el ajuste dejó el carrito vacío. */}
+        <div role="status" className="shrink-0 px-4 md:px-6">
+          {notice ? (
+            <p className="mt-4 border-l-4 border-accent bg-surface px-4 py-3 text-sm">{notice}</p>
+          ) : null}
+        </div>
+
         {hydrated && items.length > 0 ? (
           <>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 md:px-6">
               <p aria-live="polite" className="text-sm text-muted empty:hidden">
                 {refreshing ? "Actualizando…" : ""}
               </p>
-              {notice ? (
-                <p role="status" className="mt-4 border-l-4 border-accent bg-surface px-4 py-3 text-sm">
-                  {notice}
-                </p>
-              ) : null}
               <ul>
                 {items.map((cartItem) => (
                   <CartRow
@@ -190,7 +193,7 @@ export function CartDrawer() {
                 role="region"
                 aria-labelledby="cart-preview-label"
                 tabIndex={0}
-                className={`mt-2 max-h-28 overflow-y-auto whitespace-pre-line rounded-none rounded-r-lg border-l-4 border-accent bg-surface px-4 py-3 text-sm ${focusRing}`}
+                className={`mt-2 max-h-[30dvh] overflow-y-auto whitespace-pre-line rounded-none rounded-r-lg border-l-4 border-accent bg-surface px-4 py-3 text-sm ${focusRing}`}
               >
                 {message}
               </div>
@@ -253,7 +256,7 @@ function CartRow({
             <Link
               href={`/productos/${item.slug}`}
               onClick={onNavigate}
-              className={`font-medium underline-offset-4 hover:underline ${focusRing}`}
+              className={`inline-flex min-h-11 items-center font-medium underline-offset-4 hover:underline ${focusRing}`}
             >
               {item.name}
             </Link>
