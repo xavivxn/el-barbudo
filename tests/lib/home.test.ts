@@ -57,6 +57,21 @@ describe("groupByCategory", () => {
     expect(groupByCategory([])).toEqual([]);
   });
 
+  it("deja afuera los excluidos sin cambiar el total de la categoría", () => {
+    const groups = groupByCategory(
+      [perfume1, perfume2, perfume3, perfume4, perfume5, barba1],
+      4,
+      new Set(["perfume1", "perfume3"]),
+    );
+    expect(groups[0].products.map((p) => p.id)).toEqual(["perfume2", "perfume4", "perfume5"]);
+    expect(groups[0].total).toBe(5);
+  });
+
+  it("omite la sección que queda vacía después de excluir", () => {
+    const groups = groupByCategory([perfume1, barba1], 4, new Set(["barba1"]));
+    expect(groups.map((g) => g.category.value)).toEqual(["perfume"]);
+  });
+
   it("respeta perSection", () => {
     const [perfumes] = groupByCategory([perfume1, perfume2, perfume3], 2);
     expect(perfumes.products.map((p) => p.id)).toEqual(["perfume1", "perfume2"]);

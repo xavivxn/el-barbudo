@@ -15,10 +15,13 @@ export default async function BarberiaPage() {
 
   return (
     <>
-      <header className="mx-auto max-w-6xl px-4 pb-10 pt-10 md:px-8 md:pb-16 md:pt-16">
-        <h1 className="font-serif text-4xl font-medium leading-tight md:text-5xl">La barbería</h1>
-        <p className="mt-3 text-muted md:text-lg">{site.tagline}</p>
-      </header>
+      {/* Misma superficie que AboutSection: título y marca se leen como un solo bloque. */}
+      <div className="bg-surface">
+        <header className="mx-auto max-w-6xl px-4 pt-10 md:px-8 md:pt-16">
+          <h1 className="font-serif text-4xl font-medium leading-tight md:text-5xl">La barbería</h1>
+          <p className="mt-3 text-muted md:text-lg">{site.tagline}</p>
+        </header>
+      </div>
       <AboutSection />
       <ServicesList services={services} />
     </>

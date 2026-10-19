@@ -17,10 +17,10 @@ const chipRow =
   "-mx-4 flex gap-2 overflow-x-auto px-4 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible md:px-0";
 
 export default async function HomePage() {
-  // Activos, con los destacados primero: también ordena cada sección por categoría.
   const products = await listProducts();
   const featured = products.filter((product) => product.featured);
-  const groups = groupByCategory(products);
+  // Lo que ya está en "Destacados" no se repite en su categoría; "Ver todos (N)" sigue contándolo.
+  const groups = groupByCategory(products, 4, new Set(featured.map((product) => product.id)));
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-8 md:px-8 md:pb-10">
