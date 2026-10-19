@@ -37,6 +37,16 @@
   --font-sans: var(--font-inter), system-ui, sans-serif;
 }
 
+@theme {
+  --animate-page-in: page-in 200ms ease-out;
+
+  @keyframes page-in {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
 html {
   color-scheme: light;
   /* Alto del header sticky (56px) + aire: lo enfocado o anclado nunca queda tapado. */

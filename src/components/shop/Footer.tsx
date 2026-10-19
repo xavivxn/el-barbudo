@@ -35,7 +35,7 @@ export function Footer() {
               href={site.mapsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className={`inline-block py-2 ${linkClass}`}
+              className={`inline-flex min-h-11 items-center ${linkClass}`}
             >
               {site.address}
               <span className="sr-only"> (se abre en una pestaña nueva)</span>
@@ -45,7 +45,7 @@ export function Footer() {
             href={site.instagram}
             target="_blank"
             rel="noopener noreferrer"
-            className={`inline-block py-2 ${linkClass}`}
+            className={`inline-flex min-h-11 items-center ${linkClass}`}
           >
             Instagram
             <span className="sr-only"> (se abre en una pestaña nueva)</span>
