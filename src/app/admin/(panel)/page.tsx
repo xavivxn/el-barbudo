@@ -1,4 +1,3 @@
-import { X } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ProductRow } from "@/components/admin/ProductRow";
@@ -19,9 +18,7 @@ export default async function AdminProductsPage({ searchParams }: Props) {
 
   const params = await searchParams;
   const category = categoryFromSlug(firstParam(params.categoria));
-  const saved = firstParam(params.guardado) === "1";
   const products = await listProducts({ includeInactive: true, category: category?.value });
-  const basePath = category ? `/admin?categoria=${category.slug}` : "/admin";
 
   return (
     <>
@@ -29,23 +26,6 @@ export default async function AdminProductsPage({ searchParams }: Props) {
         <h1 className="text-2xl font-semibold">Productos</h1>
         <Button href="/admin/productos/nuevo">Nuevo producto</Button>
       </div>
-
-      {saved ? (
-        <div
-          role="status"
-          className="mt-6 flex items-center justify-between gap-3 border border-ok bg-surface py-1 pl-4 pr-1 text-ok"
-        >
-          <p className="font-medium">Producto guardado</p>
-          <Link
-            href={basePath}
-            replace
-            aria-label="Cerrar aviso"
-            className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            <X size={20} aria-hidden="true" />
-          </Link>
-        </div>
-      ) : null}
 
       <nav aria-label="Filtrar por categoría" className="mt-6 flex flex-wrap gap-2">
         <Chip href="/admin" active={!category}>

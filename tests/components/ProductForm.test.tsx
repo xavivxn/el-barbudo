@@ -105,6 +105,12 @@ describe("ProductForm", () => {
     expect(ids).toContainEqual(["productId", "p1"]);
     expect(ids).toContainEqual(["variants.0.id", "v1"]);
     expect(ids).toContainEqual(["variants.1.id", "v2"]);
+    // Lo que el formulario leyó al abrirse, para no pisar cambios hechos después.
+    expect(ids).toContainEqual(["loadedVariantIds", "v1,v2"]);
+    expect(ids).toContainEqual(["variants.0.origPrice", "150000"]);
+    expect(ids).toContainEqual(["variants.0.origStock", "2"]);
+    expect(ids).toContainEqual(["variants.1.origPrice", "285000"]);
+    expect(ids).toContainEqual(["variants.1.origStock", "4"]);
     expect(screen.getAllByLabelText("Precio (₲)")[1]).toHaveValue("285.000");
   });
 
@@ -118,6 +124,9 @@ describe("ProductForm", () => {
     expect(field("Nombre").getAttribute("aria-describedby")).toContain("name-error");
 
     // Al corregirlo, el error se va mientras escribe.
+    // Los errores de blur van solo junto al campo: el resumen es para el envío.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
     await user.type(field("Nombre"), "Aceite");
     expect(screen.queryByText("Escribí el nombre del producto.")).not.toBeInTheDocument();
 
@@ -145,6 +154,8 @@ describe("ProductForm", () => {
     expect(data.get("slug")).toBe("bleu-de-chanel");
     expect(data.get("variants.1.price")).toBe("285.000");
     expect(data.get("variants.1.id")).toBe("v2");
+    expect(data.get("variants.1.origStock")).toBe("4");
+    expect(data.get("loadedVariantIds")).toBe("v1,v2");
     expect(data.get("notes.top")).toBe("Pomelo");
     expect(data.get("tags")).toBe("amaderado, noche");
     expect(data.get("featured")).toBe("on");
@@ -181,6 +192,26 @@ describe("ProductForm", () => {
 
     await user.click(within(summary).getByRole("link", { name: /Nombre/ }));
     expect(field("Nombre")).toHaveFocus();
+  });
+
+  it("el resumen del envío solo cuenta los errores sin corregir y no suma los de blur", async () => {
+    saveProduct.mockResolvedValue({
+      errors: { name: "Escribí el nombre del producto.", subtitle: "Escribí un subtítulo corto." },
+    });
+    const user = userEvent.setup();
+    render(<ProductForm />);
+    await user.click(screen.getByRole("button", { name: "Guardar producto" }));
+    const summary = await screen.findByRole("alert");
+    expect(within(summary).getByText("Hay 2 campos para revisar")).toBeInTheDocument();
+
+    await user.type(field("Nombre"), "Aceite");
+    await user.click(field("Descripción"));
+    await user.tab();
+    // La descripción vacía muestra su error junto al campo, pero no entra al resumen.
+    expect(screen.getByText("Escribí la descripción del producto.")).toBeInTheDocument();
+    const after = screen.getByRole("alert");
+    expect(within(after).getByText("Hay 1 campo para revisar")).toBeInTheDocument();
+    expect(within(after).queryByText(/descripción/i)).not.toBeInTheDocument();
   });
 
   it("un error general sin campos se muestra en el resumen", async () => {

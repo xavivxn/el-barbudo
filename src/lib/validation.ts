@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { PRICE_ERROR, STOCK_ERROR } from "@/lib/admin-messages";
-import { parseGuaranies } from "@/lib/money";
+import { isHttpsUrl, parsePrice, parseStock, PRICE_ERROR, STOCK_ERROR } from "@/lib/admin-messages";
 import { CATEGORIES, type Category, type Notes } from "@/lib/types";
 
 /** "Ácido & Cítrico" -> "acido-citrico". Sin tildes ni símbolos, con guiones simples. */
@@ -48,17 +47,24 @@ const lines = (value: string) =>
     .map((line) => line.trim())
     .filter(Boolean);
 
-/** Número entero >= `min` escrito como lo escribe el admin (`285.000`, ` 285 000 `). */
-function amount(message: string, min: number) {
+/** Número escrito como lo escribe el admin (`285.000`, ` 285 000 `), validado por `parse`. */
+function amount(message: string, parse: (input: string) => number | null) {
   return z.string({ error: message }).transform((value, ctx) => {
-    const parsed = parseGuaranies(value);
-    if (parsed === null || parsed < min) {
+    const parsed = parse(value);
+    if (parsed === null) {
       ctx.issues.push({ code: "custom", message, input: value });
       return z.NEVER;
     }
     return parsed;
   });
 }
+
+/** Campo oculto numérico: si falta o no se entiende queda `undefined` (y se escribe siempre). */
+const optionalAmount = (parse: (input: string) => number | null) =>
+  z
+    .string()
+    .optional()
+    .transform((value) => (value ? (parse(value) ?? undefined) : undefined));
 
 const variantSchema = z.object({
   // El formulario manda "" para las variantes nuevas.
@@ -67,21 +73,16 @@ const variantSchema = z.object({
     .optional()
     .transform((id) => (id ? id : undefined)),
   label: required(MSG.label, 60),
-  price: amount(MSG.price, 1),
-  stock: amount(MSG.stock, 0),
+  price: amount(MSG.price, parsePrice),
+  stock: amount(MSG.stock, parseStock),
+  // Lo que el formulario leyó al abrirse: permite no pisar cambios hechos después en otro lado.
+  origPrice: optionalAmount(parsePrice),
+  origStock: optionalAmount(parseStock),
 });
 
 const imagesSchema = text.transform((value, ctx) => {
   const urls = lines(value);
-  const valid = urls.every((url) => {
-    if (!url.startsWith("https://")) return false;
-    try {
-      return new URL(url).hostname !== "";
-    } catch {
-      return false;
-    }
-  });
-  if (!valid) {
+  if (!urls.every(isHttpsUrl)) {
     ctx.issues.push({ code: "custom", message: MSG.images, input: value });
     return z.NEVER;
   }
@@ -127,6 +128,13 @@ export const productSchema = z
     featured: flag,
     active: flag,
     variants: z.array(variantSchema).min(1, MSG.variants),
+    /** Ids de las variantes que el formulario tenía al abrirse: solo esas se pueden borrar. */
+    loadedVariantIds: text.transform((value) =>
+      value
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
+    ),
   })
   .superRefine((data, ctx) => {
     if (data.category !== "perfume") return;
@@ -163,7 +171,7 @@ export function fieldErrors(
 
 const SCALAR_FIELDS = ["name", "slug", "subtitle", "category", "description", "benefits", "tags", "images"] as const;
 const NOTE_FIELDS = ["top", "heart", "base"] as const;
-const VARIANT_FIELDS = ["id", "label", "price", "stock"] as const;
+const VARIANT_FIELDS = ["id", "label", "price", "stock", "origPrice", "origStock"] as const;
 
 const str = (value: FormDataEntryValue | null) => (typeof value === "string" ? value : "");
 
@@ -176,12 +184,13 @@ export function parseProductForm(formData: FormData): Record<string, unknown> {
   for (const field of SCALAR_FIELDS) result[field] = str(formData.get(field));
 
   result.notes = Object.fromEntries(NOTE_FIELDS.map((field) => [field, str(formData.get(`notes.${field}`))]));
+  result.loadedVariantIds = str(formData.get("loadedVariantIds"));
   result.featured = formData.get("featured") === "on";
   result.active = formData.get("active") === "on";
 
   const byIndex = new Map<number, Record<string, string>>();
   for (const [key, value] of formData.entries()) {
-    const match = /^variants\.(\d+)\.(id|label|price|stock)$/.exec(key);
+    const match = /^variants\.(\d+)\.(id|label|price|stock|origPrice|origStock)$/.exec(key);
     if (!match || typeof value !== "string") continue;
     const index = Number(match[1]);
     const row = byIndex.get(index) ?? Object.fromEntries(VARIANT_FIELDS.map((f) => [f, ""]));

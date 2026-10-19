@@ -2,10 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { PRICE_ERROR, STOCK_ERROR } from "@/lib/admin-messages";
+import { parsePrice, parseStock, PRICE_ERROR, STOCK_ERROR } from "@/lib/admin-messages";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { parseGuaranies } from "@/lib/money";
 import {
   fieldErrors,
   parseProductForm,
@@ -32,7 +31,7 @@ class ProductNotFound extends Error {}
 
 /**
  * Edición en línea de una variante desde el listado. Cada campo es opcional; lo que llega pasa por
- * `parseGuaranies` igual que en el formulario.
+ * `parsePrice` / `parseStock` igual que en el formulario.
  */
 export async function updateVariant(
   variantId: string,
@@ -46,12 +45,12 @@ export async function updateVariant(
   const update: { price?: number; stock?: number } = {};
 
   if (price !== undefined) {
-    const parsed = typeof price === "string" ? parseGuaranies(price) : null;
-    if (parsed === null || parsed < 1) return { error: PRICE_ERROR };
+    const parsed = parsePrice(price);
+    if (parsed === null) return { error: PRICE_ERROR };
     update.price = parsed;
   }
   if (stock !== undefined) {
-    const parsed = typeof stock === "string" ? parseGuaranies(stock) : null;
+    const parsed = parseStock(stock);
     if (parsed === null) return { error: STOCK_ERROR };
     update.stock = parsed;
   }
@@ -77,14 +76,21 @@ export async function markSoldOut(productId: string): Promise<{ ok: true } | { e
   return { ok: true };
 }
 
-/** Invierte "destacado" o "activo". Cualquier otro nombre de campo se ignora. */
-export async function toggleProductFlag(id: string, flag: "featured" | "active"): Promise<void> {
+/**
+ * Fija "destacado" o "activo" en el valor pedido (idempotente: una pantalla desactualizada o dos
+ * pedidos seguidos no invierten la intención). Cualquier otro nombre de campo se ignora.
+ */
+export async function toggleProductFlag(
+  id: string,
+  flag: "featured" | "active",
+  value: boolean,
+): Promise<void> {
   await requireAdmin();
-  if ((flag !== "featured" && flag !== "active") || typeof id !== "string") return;
+  if ((flag !== "featured" && flag !== "active") || typeof id !== "string" || typeof value !== "boolean") {
+    return;
+  }
 
-  const current = await prisma.product.findUnique({ where: { id }, select: { [flag]: true } });
-  if (!current) return;
-  await prisma.product.update({ where: { id }, data: { [flag]: !current[flag] } });
+  await prisma.product.updateMany({ where: { id }, data: { [flag]: value } });
   revalidateAll();
 }
 
@@ -117,7 +123,14 @@ async function createProduct(input: ProductInput) {
   });
 }
 
-/** Actualiza por id, crea las nuevas y borra las quitadas, todo o nada. */
+/**
+ * Actualiza por id, crea las nuevas y borra las quitadas, todo o nada.
+ *
+ * El formulario trae lo que había al abrirse. Para no pisar cambios hechos después (stock editado
+ * en el listado, variantes agregadas desde otra pestaña): precio y stock solo se escriben si el
+ * admin los cambió respecto de lo que el formulario leyó, y solo se borran variantes que el
+ * formulario tenía cargadas.
+ */
 async function updateProduct(productId: string, input: ProductInput) {
   await prisma.$transaction(async (tx) => {
     const existing = await tx.product.findUnique({
@@ -137,11 +150,22 @@ async function updateProduct(productId: string, input: ProductInput) {
         added.push(variant);
       }
     }
+    const keptIds = new Set(kept.map((variant) => variant.id));
+    const removed = input.loadedVariantIds.filter((id) => existingIds.has(id) && !keptIds.has(id));
 
     await tx.product.update({ where: { id: productId }, data: productData(input) });
-    await tx.variant.deleteMany({ where: { productId, id: { notIn: kept.map((variant) => variant.id) } } });
-    for (const { id, label, price, stock } of kept) {
-      await tx.variant.update({ where: { id }, data: { label, price, stock } });
+    if (removed.length > 0) {
+      await tx.variant.deleteMany({ where: { productId, id: { in: removed } } });
+    }
+    for (const { id, label, price, stock, origPrice, origStock } of kept) {
+      await tx.variant.update({
+        where: { id },
+        data: {
+          label,
+          ...(price !== origPrice ? { price } : {}),
+          ...(stock !== origStock ? { stock } : {}),
+        },
+      });
     }
     if (added.length > 0) {
       await tx.variant.createMany({

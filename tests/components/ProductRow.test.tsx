@@ -189,7 +189,7 @@ describe("ProductRow", () => {
     expect(screen.queryByText("Guardado")).not.toBeInTheDocument();
   });
 
-  it("los interruptores son switches con nombre visible y llaman a toggleProductFlag", async () => {
+  it("los interruptores son switches con nombre visible y mandan el valor deseado", async () => {
     const user = userEvent.setup();
     renderRow({ featured: false, active: true });
     const featured = screen.getByRole("switch", { name: "Destacado" });
@@ -197,9 +197,32 @@ describe("ProductRow", () => {
     expect(featured).toHaveAttribute("aria-checked", "false");
     expect(active).toHaveAttribute("aria-checked", "true");
     await user.click(featured);
-    expect(actions.toggleProductFlag).toHaveBeenCalledWith("p1", "featured");
+    expect(actions.toggleProductFlag).toHaveBeenCalledWith("p1", "featured", true);
     await user.click(active);
-    expect(actions.toggleProductFlag).toHaveBeenCalledWith("p1", "active");
+    expect(actions.toggleProductFlag).toHaveBeenCalledWith("p1", "active", false);
+  });
+
+  it("al guardar el interruptor cambia al instante, conserva el foco y solo él queda pendiente", async () => {
+    let finish!: () => void;
+    actions.toggleProductFlag.mockReturnValue(new Promise<void>((resolve) => (finish = resolve)));
+    const user = userEvent.setup();
+    renderRow({ featured: false, active: true });
+    const featured = screen.getByRole("switch", { name: "Destacado" });
+    const active = screen.getByRole("switch", { name: "Activo" });
+
+    await user.click(featured);
+    expect(featured).toHaveAttribute("aria-checked", "true");
+    expect(featured).toHaveAttribute("aria-disabled", "true");
+    expect(featured).not.toBeDisabled();
+    expect(featured).toHaveFocus();
+    expect(active).not.toHaveAttribute("aria-disabled");
+
+    // Un segundo clic mientras guarda no manda otro pedido.
+    await user.click(featured);
+    expect(actions.toggleProductFlag).toHaveBeenCalledTimes(1);
+
+    await act(async () => finish());
+    expect(featured).toHaveFocus();
   });
 
   it("Marcar agotado pide confirmación y luego llama a la action", async () => {
@@ -215,12 +238,37 @@ describe("ProductRow", () => {
     expect(actions.markSoldOut).toHaveBeenCalledWith("p1");
   });
 
+  it("el foco vuelve a Marcar agotado al cancelar y al confirmar", async () => {
+    const user = userEvent.setup();
+    renderRow();
+    await user.click(screen.getByRole("button", { name: "Marcar agotado" }));
+    expect(screen.getByRole("button", { name: "Sí, marcar agotado" })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.getByRole("button", { name: "Marcar agotado" })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Marcar agotado" }));
+    await user.click(screen.getByRole("button", { name: "Sí, marcar agotado" }));
+    expect(document.activeElement).toBe(document.getElementById("p1-sold-out"));
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
   it("con todo el stock en 0 el botón queda desactivado y se avisa", () => {
     renderRow({
       variants: [{ id: "v1", label: "100 ml", price: 285000, stock: 0 }],
     });
-    expect(screen.getByRole("button", { name: "Marcar agotado" })).toBeDisabled();
+    const button = screen.getByRole("button", { name: "Marcar agotado" });
+    // aria-disabled y no disabled: sigue enfocable, así el foco no se pierde.
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    expect(button).not.toBeDisabled();
     expect(screen.getByText(/Agotado/)).toBeInTheDocument();
+  });
+
+  it("con todo agotado, activar Marcar agotado no hace nada", async () => {
+    const user = userEvent.setup();
+    renderRow({ variants: [{ id: "v1", label: "100 ml", price: 285000, stock: 0 }] });
+    await user.click(screen.getByRole("button", { name: "Marcar agotado" }));
+    expect(screen.queryByRole("button", { name: "Sí, marcar agotado" })).not.toBeInTheDocument();
   });
 
   it("un producto inactivo lo dice", () => {

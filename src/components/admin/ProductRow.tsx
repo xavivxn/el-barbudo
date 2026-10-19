@@ -6,18 +6,13 @@ import { useEffect, useId, useOptimistic, useRef, useState, useTransition } from
 import { markSoldOut, toggleProductFlag, updateVariant } from "@/app/admin/actions";
 import { Button } from "@/components/ui/Button";
 import { SafeImage } from "@/components/ui/SafeImage";
-import { PRICE_ERROR, STOCK_ERROR } from "@/lib/admin-messages";
-import { parseGuaranies } from "@/lib/money";
+import { parsePrice, parseStock, PRICE_ERROR, STOCK_ERROR } from "@/lib/admin-messages";
+import { formatThousands } from "@/lib/money";
 import { isSoldOut } from "@/lib/stock";
 import { CATEGORIES, type ProductDTO, type VariantDTO } from "@/lib/types";
 
 const SAVED_VISIBLE_MS = 2000;
 const GENERIC_ERROR = "No se pudo guardar. Probá de nuevo.";
-
-/** 285000 -> "285.000". A mano para que servidor y navegador escriban exactamente lo mismo. */
-function withDots(value: number): string {
-  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-}
 
 type Status = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { kind: "error"; message: string };
 
@@ -34,7 +29,7 @@ type NumberFieldProps = {
 
 /** Campo numérico que guarda al perder el foco o con Enter, y solo si el valor cambió. */
 function InlineNumberField({ id, label, kind, saved, onSave }: NumberFieldProps) {
-  const format = kind === "price" ? withDots : String;
+  const format = kind === "price" ? formatThousands : String;
   const [text, setText] = useState(format(saved));
   const [savedValue, setSavedValue] = useState(saved);
   const [seenProp, setSeenProp] = useState(saved);
@@ -55,9 +50,8 @@ function InlineNumberField({ id, label, kind, saved, onSave }: NumberFieldProps)
   }
 
   async function commit() {
-    const parsed = parseGuaranies(text);
-    const invalid = parsed === null || (kind === "price" && parsed < 1);
-    if (invalid) {
+    const parsed = kind === "price" ? parsePrice(text) : parseStock(text);
+    if (parsed === null) {
       clearTimeout(timer.current);
       setStatus({ kind: "error", message: kind === "price" ? PRICE_ERROR : STOCK_ERROR });
       return;
@@ -181,12 +175,13 @@ function VariantFields({ variant, productName }: { variant: VariantDTO; productN
 function Switch({
   label,
   checked,
-  disabled,
+  pending,
   onToggle,
 }: {
   label: string;
   checked: boolean;
-  disabled?: boolean;
+  /** Mientras guarda no se acepta otro clic, pero el foco se queda en el interruptor. */
+  pending?: boolean;
   onToggle: () => void;
 }) {
   return (
@@ -194,9 +189,11 @@ function Switch({
       type="button"
       role="switch"
       aria-checked={checked}
-      disabled={disabled}
-      onClick={onToggle}
-      className={`inline-flex min-h-11 items-center gap-3 rounded-lg pr-2 text-base disabled:opacity-60 ${focusRing}`}
+      aria-disabled={pending || undefined}
+      onClick={() => {
+        if (!pending) onToggle();
+      }}
+      className={`inline-flex min-h-11 items-center gap-3 rounded-lg pr-2 text-base aria-disabled:opacity-60 ${focusRing}`}
     >
       <span
         aria-hidden="true"
@@ -216,9 +213,12 @@ function Switch({
 }
 
 export function ProductRow({ product }: { product: ProductDTO }) {
-  const [pendingFlag, startFlag] = useTransition();
+  const [pendingFeatured, startFeatured] = useTransition();
+  const [pendingActive, startActive] = useTransition();
   const [pendingSoldOut, startSoldOut] = useTransition();
   const [confirming, setConfirming] = useState(false);
+  const refocusSoldOut = useRef(false);
+  const soldOutButtonId = `${product.id}-sold-out`;
   const [error, setError] = useState<string | null>(null);
   const [flags, setFlags] = useOptimistic(
     { featured: product.featured, active: product.active },
@@ -229,19 +229,33 @@ export function ProductRow({ product }: { product: ProductDTO }) {
 
   function toggle(flag: "featured" | "active") {
     setError(null);
-    startFlag(async () => {
-      setFlags({ [flag]: !flags[flag] });
+    const value = !flags[flag];
+    (flag === "featured" ? startFeatured : startActive)(async () => {
+      setFlags({ [flag]: value });
       try {
-        await toggleProductFlag(product.id, flag);
+        await toggleProductFlag(product.id, flag, value);
       } catch {
         setError(GENERIC_ERROR);
       }
     });
   }
 
+  // Al cerrar la confirmación el botón vuelve a aparecer: el foco vuelve con él.
+  useEffect(() => {
+    if (refocusSoldOut.current && !confirming) {
+      refocusSoldOut.current = false;
+      document.getElementById(soldOutButtonId)?.focus();
+    }
+  });
+
+  function closeConfirm() {
+    refocusSoldOut.current = true;
+    setConfirming(false);
+  }
+
   function soldOutAll() {
     setError(null);
-    setConfirming(false);
+    closeConfirm();
     startSoldOut(async () => {
       try {
         const result = await markSoldOut(product.id);
@@ -292,13 +306,13 @@ export function ProductRow({ product }: { product: ProductDTO }) {
           <Switch
             label="Destacado"
             checked={flags.featured}
-            disabled={pendingFlag}
+            pending={pendingFeatured}
             onToggle={() => toggle("featured")}
           />
           <Switch
             label="Activo"
             checked={flags.active}
-            disabled={pendingFlag}
+            pending={pendingActive}
             onToggle={() => toggle("active")}
           />
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
@@ -308,16 +322,21 @@ export function ProductRow({ product }: { product: ProductDTO }) {
                 <Button size="sm" onClick={soldOutAll} autoFocus>
                   Sí, marcar agotado
                 </Button>
-                <Button size="sm" variant="secondary" onClick={() => setConfirming(false)}>
+                <Button size="sm" variant="secondary" onClick={closeConfirm}>
                   Cancelar
                 </Button>
               </>
             ) : (
               <Button
+                id={soldOutButtonId}
                 size="sm"
                 variant="secondary"
-                disabled={soldOut || pendingSoldOut}
-                onClick={() => setConfirming(true)}
+                // aria-disabled (no disabled): sigue enfocable y el foco no se pierde al agotarse.
+                aria-disabled={soldOut || pendingSoldOut || undefined}
+                onClick={() => {
+                  if (!soldOut && !pendingSoldOut) setConfirming(true);
+                }}
+                className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-fg"
               >
                 {pendingSoldOut ? "Guardando…" : "Marcar agotado"}
               </Button>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPYG, parseGuaranies } from "@/lib/money";
+import { formatPYG, formatThousands, parseGuaranies } from "@/lib/money";
 
 describe("formatPYG", () => {
   it("formatea guaraníes con punto como separador de miles", () => {
@@ -22,5 +22,19 @@ describe("parseGuaranies", () => {
     for (const bad of ["", "-5", "12,5", "abc", "1.2.3a", "12.5", "1.2.3", "1.2345", "99999999999999999999", "2.000.000.001", "1.250 000"]) {
       expect(parseGuaranies(bad)).toBeNull();
     }
+  });
+});
+
+describe("formatThousands", () => {
+  it("separa los miles con punto, sin símbolo", () => {
+    expect(formatThousands(0)).toBe("0");
+    expect(formatThousands(999)).toBe("999");
+    expect(formatThousands(1000)).toBe("1.000");
+    expect(formatThousands(285000)).toBe("285.000");
+    expect(formatThousands(1050000)).toBe("1.050.000");
+  });
+
+  it("lo que escribe vuelve a leerse igual con parseGuaranies", () => {
+    expect(parseGuaranies(formatThousands(1050000))).toBe(1050000);
   });
 });

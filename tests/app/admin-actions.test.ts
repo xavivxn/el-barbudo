@@ -7,7 +7,7 @@ const tx = vi.hoisted(() => ({
   variant: { update: vi.fn(), deleteMany: vi.fn(), createMany: vi.fn() },
 }));
 const db = vi.hoisted(() => ({
-  product: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
+  product: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
   variant: { update: vi.fn(), updateMany: vi.fn() },
   $transaction: vi.fn(),
 }));
@@ -72,13 +72,14 @@ describe("sin sesión ninguna action escribe", () => {
   it.each([
     ["updateVariant", () => updateVariant("v1", { price: "100" })],
     ["markSoldOut", () => markSoldOut("p1")],
-    ["toggleProductFlag", () => toggleProductFlag("p1", "active")],
+    ["toggleProductFlag", () => toggleProductFlag("p1", "active", true)],
     ["saveProduct", () => saveProduct({}, productForm())],
   ])("%s redirige antes de tocar la base", async (_name, call) => {
     await expect(call()).rejects.toThrow("NEXT_REDIRECT:/admin/login");
     expect(db.variant.update).not.toHaveBeenCalled();
     expect(db.variant.updateMany).not.toHaveBeenCalled();
     expect(db.product.update).not.toHaveBeenCalled();
+    expect(db.product.updateMany).not.toHaveBeenCalled();
     expect(db.product.findUnique).not.toHaveBeenCalled();
     expect(db.$transaction).not.toHaveBeenCalled();
     expect(revalidatePath).not.toHaveBeenCalled();
@@ -160,29 +161,34 @@ describe("markSoldOut", () => {
 });
 
 describe("toggleProductFlag", () => {
-  it.each(["featured", "active"] as const)("invierte %s", async (flag) => {
-    db.product.findUnique.mockResolvedValue({ [flag]: false });
-    await toggleProductFlag("p1", flag);
-    expect(db.product.update).toHaveBeenCalledWith({ where: { id: "p1" }, data: { [flag]: true } });
+  it.each(["featured", "active"] as const)("fija %s en el valor pedido sin leer antes", async (flag) => {
+    await toggleProductFlag("p1", flag, true);
+    expect(db.product.updateMany).toHaveBeenCalledWith({ where: { id: "p1" }, data: { [flag]: true } });
+    expect(db.product.findUnique).not.toHaveBeenCalled();
     expect(revalidatePath).toHaveBeenCalledWith("/", "layout");
   });
 
-  it("apaga lo que estaba prendido", async () => {
-    db.product.findUnique.mockResolvedValue({ active: true });
-    await toggleProductFlag("p1", "active");
-    expect(db.product.update).toHaveBeenCalledWith({ where: { id: "p1" }, data: { active: false } });
+  it("es idempotente: pedir false dos veces escribe false las dos veces", async () => {
+    await toggleProductFlag("p1", "active", false);
+    await toggleProductFlag("p1", "active", false);
+    expect(db.product.updateMany.mock.calls).toEqual([
+      [{ where: { id: "p1" }, data: { active: false } }],
+      [{ where: { id: "p1" }, data: { active: false } }],
+    ]);
   });
 
-  it("solo acepta featured o active", async () => {
-    await toggleProductFlag("p1", "name" as unknown as "active");
-    expect(db.product.findUnique).not.toHaveBeenCalled();
+  it("solo acepta featured o active y un valor booleano", async () => {
+    await toggleProductFlag("p1", "name" as unknown as "active", true);
+    await toggleProductFlag("p1", "active", "false" as unknown as boolean);
+    await toggleProductFlag(7 as unknown as string, "active", true);
+    expect(db.product.updateMany).not.toHaveBeenCalled();
     expect(db.product.update).not.toHaveBeenCalled();
   });
 
-  it("un producto que no existe no escribe", async () => {
-    db.product.findUnique.mockResolvedValue(null);
-    await toggleProductFlag("nope", "active");
-    expect(db.product.update).not.toHaveBeenCalled();
+  it("verifica la sesión antes de escribir", async () => {
+    db.product.updateMany.mockImplementation(async () => void order.push("write"));
+    await toggleProductFlag("p1", "active", true);
+    expect(order).toEqual(["auth", "write"]);
   });
 });
 
@@ -248,11 +254,12 @@ describe("saveProduct", () => {
 
   describe("editar", () => {
     const existing = { variants: [{ id: "v1" }, { id: "v2" }] };
+    const loaded = { productId: "p1", loadedVariantIds: "v1,v2" };
 
-    it("actualiza por id, crea las nuevas y borra las quitadas, todo en una transacción", async () => {
+    it("actualiza por id, crea las nuevas y borra solo las quitadas, todo en una transacción", async () => {
       tx.product.findUnique.mockResolvedValue(existing);
-      const form = productForm({ productId: "p1" }, [
-        { id: "v1", label: "30 ml", price: "90.000", stock: "5" },
+      const form = productForm(loaded, [
+        { id: "v1", label: "30 ml", price: "90.000", stock: "5", origPrice: "85000", origStock: "3" },
         { id: "", label: "60 ml", price: "150.000", stock: "2" },
       ]);
       await expect(saveProduct({}, form)).rejects.toThrow("NEXT_REDIRECT:/admin?guardado=1");
@@ -261,9 +268,7 @@ describe("saveProduct", () => {
       expect(tx.product.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: "p1" }, data: expect.objectContaining({ slug: "aceite-de-barba" }) }),
       );
-      expect(tx.variant.deleteMany).toHaveBeenCalledWith({
-        where: { productId: "p1", id: { notIn: ["v1"] } },
-      });
+      expect(tx.variant.deleteMany).toHaveBeenCalledWith({ where: { productId: "p1", id: { in: ["v2"] } } });
       expect(tx.variant.update).toHaveBeenCalledWith({
         where: { id: "v1" },
         data: { label: "30 ml", price: 90000, stock: 5 },
@@ -274,15 +279,70 @@ describe("saveProduct", () => {
       expect(db.product.create).not.toHaveBeenCalled();
     });
 
-    it("un id que pertenece a otro producto se trata como variante nueva", async () => {
+    it("un stock sin tocar en el formulario no pisa un valor más nuevo de la base", async () => {
       tx.product.findUnique.mockResolvedValue(existing);
-      const form = productForm({ productId: "p1" }, [{ id: "ajena", label: "x", price: "1.000", stock: "1" }]);
+      // El formulario se abrió con stock 3; después el listado lo dejó en 0. Acá solo se cambió el precio.
+      const form = productForm(loaded, [
+        { id: "v1", label: "30 ml", price: "90.000", stock: "3", origPrice: "85000", origStock: "3" },
+        { id: "v2", label: "60 ml", price: "150.000", stock: "2", origPrice: "150000", origStock: "2" },
+      ]);
+      await expect(saveProduct({}, form)).rejects.toThrow("NEXT_REDIRECT");
+      expect(tx.variant.update).toHaveBeenCalledWith({ where: { id: "v1" }, data: { label: "30 ml", price: 90000 } });
+      expect(tx.variant.update).toHaveBeenCalledWith({ where: { id: "v2" }, data: { label: "60 ml" } });
+    });
+
+    it("un precio sin tocar tampoco se reescribe, y el cambiado sí", async () => {
+      tx.product.findUnique.mockResolvedValue(existing);
+      const form = productForm(loaded, [
+        { id: "v1", label: "30 ml", price: "85.000", stock: "9", origPrice: "85000", origStock: "3" },
+        { id: "v2", label: "60 ml", price: "150.000", stock: "2", origPrice: "150000", origStock: "2" },
+      ]);
+      await expect(saveProduct({}, form)).rejects.toThrow("NEXT_REDIRECT");
+      expect(tx.variant.update).toHaveBeenCalledWith({ where: { id: "v1" }, data: { label: "30 ml", stock: 9 } });
+    });
+
+    it("sin los valores originales (formulario viejo) escribe precio y stock", async () => {
+      tx.product.findUnique.mockResolvedValue(existing);
+      const form = productForm(loaded, [{ id: "v1", label: "30 ml", price: "90.000", stock: "5" }]);
+      await expect(saveProduct({}, form)).rejects.toThrow("NEXT_REDIRECT");
+      expect(tx.variant.update).toHaveBeenCalledWith({
+        where: { id: "v1" },
+        data: { label: "30 ml", price: 90000, stock: 5 },
+      });
+    });
+
+    it("una variante creada después de abrir el formulario no se borra", async () => {
+      // v3 la agregaron desde otra pestaña: está en la base pero no en loadedVariantIds.
+      tx.product.findUnique.mockResolvedValue({ variants: [{ id: "v1" }, { id: "v2" }, { id: "v3" }] });
+      const form = productForm(loaded, [
+        { id: "v1", label: "30 ml", price: "85.000", stock: "3", origPrice: "85000", origStock: "3" },
+      ]);
+      await expect(saveProduct({}, form)).rejects.toThrow("NEXT_REDIRECT");
+      expect(tx.variant.deleteMany).toHaveBeenCalledTimes(1);
+      expect(tx.variant.deleteMany).toHaveBeenCalledWith({ where: { productId: "p1", id: { in: ["v2"] } } });
+    });
+
+    it("sin variantes quitadas no borra nada", async () => {
+      tx.product.findUnique.mockResolvedValue(existing);
+      const form = productForm(loaded, [
+        { id: "v1", label: "a", price: "1.000", stock: "1", origPrice: "1000", origStock: "1" },
+        { id: "v2", label: "b", price: "1.000", stock: "1", origPrice: "1000", origStock: "1" },
+      ]);
+      await expect(saveProduct({}, form)).rejects.toThrow("NEXT_REDIRECT");
+      expect(tx.variant.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("un id que pertenece a otro producto se trata como variante nueva y no borra nada ajeno", async () => {
+      tx.product.findUnique.mockResolvedValue(existing);
+      const form = productForm({ productId: "p1", loadedVariantIds: "ajena" }, [
+        { id: "ajena", label: "x", price: "1.000", stock: "1" },
+      ]);
       await expect(saveProduct({}, form)).rejects.toThrow("NEXT_REDIRECT");
       expect(tx.variant.update).not.toHaveBeenCalled();
+      expect(tx.variant.deleteMany).not.toHaveBeenCalled();
       expect(tx.variant.createMany).toHaveBeenCalledWith({
         data: [{ productId: "p1", label: "x", price: 1000, stock: 1 }],
       });
-      expect(tx.variant.deleteMany).toHaveBeenCalledWith({ where: { productId: "p1", id: { notIn: [] } } });
     });
 
     it("un producto que ya no existe no se recrea", async () => {

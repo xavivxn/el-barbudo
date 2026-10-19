@@ -14,3 +14,8 @@ export function parseGuaranies(input: string): number | null {
   const value = Number(trimmed.replace(/[. ]/g, ""));
   return value <= MAX_GUARANIES ? value : null;
 }
+
+/** 285000 -> "285.000". Sin Intl: servidor y navegador escriben exactamente lo mismo. */
+export function formatThousands(amount: number): string {
+  return String(amount).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}

@@ -17,7 +17,8 @@ import {
 import { type FormState, saveProduct } from "@/app/admin/actions";
 import { Button } from "@/components/ui/Button";
 import { SafeImage } from "@/components/ui/SafeImage";
-import { parseGuaranies } from "@/lib/money";
+import { isHttpsUrl, parsePrice } from "@/lib/admin-messages";
+import { formatThousands } from "@/lib/money";
 import { CATEGORIES, type Category, type ProductDTO } from "@/lib/types";
 import { fieldErrors, parseProductForm, productSchema, slugify } from "@/lib/validation";
 
@@ -25,10 +26,16 @@ const initialState: FormState = {};
 
 const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
-/** "285000" -> "285.000" (igual que en la tienda). */
-const withDots = (value: number) => String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-
-type Row = { uid: number; id: string; label: string; price: string; stock: string };
+type Row = {
+  uid: number;
+  id: string;
+  label: string;
+  price: string;
+  stock: string;
+  /** Precio y stock con los que se abrió el formulario (vacíos en variantes nuevas). */
+  origPrice: string;
+  origStock: string;
+};
 
 /** `uid` solo sirve de `key` de React: las filas se quitan y agregan sin mezclar sus campos. */
 let lastUid = 0;
@@ -38,6 +45,8 @@ const makeRow = (data: Partial<Row> = {}): Row => ({
   label: "",
   price: "",
   stock: "",
+  origPrice: "",
+  origStock: "",
   ...data,
 });
 
@@ -82,15 +91,6 @@ function targetIdOf(key: string): string {
   if (key === "notes") return "notes-top";
   if (key === "variants") return "variants-add";
   return idOf(key);
-}
-
-function previewable(url: string): boolean {
-  if (!url.startsWith("https://")) return false;
-  try {
-    return new URL(url).hostname.includes(".");
-  } catch {
-    return false;
-  }
 }
 
 const inputClass = (error?: string) =>
@@ -189,7 +189,14 @@ export function ProductForm({ product }: { product?: ProductDTO }) {
   const [rows, setRows] = useState<Row[]>(() =>
     product && product.variants.length > 0
       ? product.variants.map((variant) =>
-          makeRow({ id: variant.id, label: variant.label, price: withDots(variant.price), stock: String(variant.stock) }),
+          makeRow({
+            id: variant.id,
+            label: variant.label,
+            price: formatThousands(variant.price),
+            stock: String(variant.stock),
+            origPrice: String(variant.price),
+            origStock: String(variant.stock),
+          }),
         )
       : [makeRow()],
   );
@@ -225,7 +232,7 @@ export function ProductForm({ product }: { product?: ProductDTO }) {
     values.images
       .split(/\r?\n/)
       .map((line) => line.trim())
-      .filter(previewable)
+      .filter(isHttpsUrl)
       .slice(0, 12),
   );
 
@@ -304,7 +311,10 @@ export function ProductForm({ product }: { product?: ProductDTO }) {
     setErrors((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith("variants."))));
   }
 
-  const errorKeys = Object.keys(errors).sort((a, b) => {
+  // El resumen es de los errores del último envío que siguen sin corregir; los de blur solo van junto al campo.
+  const errorKeys = Object.keys(state.errors ?? {})
+    .filter((key) => key in errors)
+    .sort((a, b) => {
     const [x, y] = [errorOrder(a), errorOrder(b)];
     return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
   });
@@ -320,7 +330,16 @@ export function ProductForm({ product }: { product?: ProductDTO }) {
 
   return (
     <form onSubmit={onSubmit} onBlur={onBlur} onChange={onChange} noValidate className="mt-6 flex flex-col gap-10">
-      {product ? <input type="hidden" name="productId" value={product.id} /> : null}
+      {product ? (
+        <>
+          <input type="hidden" name="productId" value={product.id} />
+          <input
+            type="hidden"
+            name="loadedVariantIds"
+            value={product.variants.map((variant) => variant.id).join(",")}
+          />
+        </>
+      ) : null}
 
       {summaryVisible ? (
         <div
@@ -428,6 +447,12 @@ export function ProductForm({ product }: { product?: ProductDTO }) {
                 className="grid grid-cols-2 items-start gap-3 border-t border-line pt-5 first:border-t-0 first:pt-0 sm:grid-cols-[minmax(0,1fr)_9rem_6rem_auto]"
               >
                 <input type="hidden" name={`${base}.id`} value={row.id} />
+                {row.id ? (
+                  <>
+                    <input type="hidden" name={`${base}.origPrice`} value={row.origPrice} />
+                    <input type="hidden" name={`${base}.origStock`} value={row.origStock} />
+                  </>
+                ) : null}
                 <Field
                   id={idOf(`${base}.label`)}
                   label="Tamaño o presentación"
@@ -456,8 +481,8 @@ export function ProductForm({ product }: { product?: ProductDTO }) {
                       value={row.price}
                       onChange={(event) => updateRow(row.uid, { price: event.target.value })}
                       onBlur={() => {
-                        const parsed = parseGuaranies(row.price);
-                        if (parsed !== null) updateRow(row.uid, { price: withDots(parsed) });
+                        const parsed = parsePrice(row.price);
+                        if (parsed !== null) updateRow(row.uid, { price: formatThousands(parsed) });
                       }}
                       placeholder="285.000"
                       autoComplete="off"

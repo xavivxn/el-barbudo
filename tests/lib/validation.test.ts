@@ -133,6 +133,21 @@ describe("productSchema", () => {
     expect(data.variants[1].id).toBeUndefined();
   });
 
+  it("lee los valores originales y los ids cargados del formulario", () => {
+    const data = parseOk({
+      loadedVariantIds: " v1, v2 ,,",
+      variants: [
+        { id: "v1", label: "x", price: "100", stock: "1", origPrice: "90000", origStock: "0" },
+        { id: "", label: "y", price: "200", stock: "2", origPrice: "no", origStock: "" },
+      ],
+    });
+    expect(data.loadedVariantIds).toEqual(["v1", "v2"]);
+    expect(data.variants[0]).toMatchObject({ origPrice: 90000, origStock: 0 });
+    expect(data.variants[1].origPrice).toBeUndefined();
+    expect(data.variants[1].origStock).toBeUndefined();
+    expect(parseOk().loadedVariantIds).toEqual([]);
+  });
+
   it("valida la dirección (slug)", () => {
     expect(fieldErrors(productSchema.safeParse(form({ slug: "" }))).slug).toBeDefined();
     expect(fieldErrors(productSchema.safeParse(form({ slug: "Con Espacios" }))).slug).toBe(
@@ -233,10 +248,13 @@ describe("parseProductForm", () => {
         ["notes.top", "Pomelo"],
         ["notes.heart", "Jengibre"],
         ["notes.base", "Cedro"],
+        ["loadedVariantIds", "v1,v9"],
         ["variants.0.id", "v1"],
         ["variants.0.label", "50 ml"],
         ["variants.0.price", "100.000"],
         ["variants.0.stock", "2"],
+        ["variants.0.origPrice", "90000"],
+        ["variants.0.origStock", "5"],
         ["variants.1.id", ""],
         ["variants.1.label", "100 ml"],
         ["variants.1.price", "180.000"],
@@ -246,9 +264,10 @@ describe("parseProductForm", () => {
     expect(parsed.name).toBe("Bleu");
     expect(parsed.notes).toEqual({ top: "Pomelo", heart: "Jengibre", base: "Cedro" });
     expect(parsed.variants).toEqual([
-      { id: "v1", label: "50 ml", price: "100.000", stock: "2" },
-      { id: "", label: "100 ml", price: "180.000", stock: "0" },
+      { id: "v1", label: "50 ml", price: "100.000", stock: "2", origPrice: "90000", origStock: "5" },
+      { id: "", label: "100 ml", price: "180.000", stock: "0", origPrice: "", origStock: "" },
     ]);
+    expect(parsed.loadedVariantIds).toBe("v1,v9");
   });
 
   it("ordena las variantes por índice numérico (10 después de 2)", () => {
