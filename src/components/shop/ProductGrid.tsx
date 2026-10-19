@@ -2,6 +2,10 @@ import type { ReactNode } from "react";
 import { ProductCard } from "@/components/shop/ProductCard";
 import type { ProductDTO } from "@/lib/types";
 
+/** Clases de la grilla de tarjetas; la comparten las grillas que animan sus tarjetas. */
+export const PRODUCT_GRID_CLASS =
+  "grid grid-cols-2 gap-x-4 gap-y-12 md:grid-cols-3 md:gap-x-6 lg:grid-cols-4";
+
 type ProductGridProps = {
   products: ProductDTO[];
   /** Lo que se muestra si no hay productos. */
@@ -16,7 +20,7 @@ export function ProductGrid({ products, empty, headingLevel }: ProductGridProps)
   }
 
   return (
-    <ul className="grid grid-cols-2 gap-x-4 gap-y-12 md:grid-cols-3 md:gap-x-6 lg:grid-cols-4">
+    <ul className={PRODUCT_GRID_CLASS}>
       {products.map((product) => (
         <li key={product.id}>
           <ProductCard product={product} headingLevel={headingLevel} />

@@ -5,25 +5,24 @@ import { AnimatePresence, motion, type Transition, type Variants } from "motion/
 import Link from "next/link";
 import { type KeyboardEvent, useId, useRef, useState } from "react";
 import { ProductCard } from "@/components/shop/ProductCard";
-import { ProductGrid } from "@/components/shop/ProductGrid";
+import { PRODUCT_GRID_CLASS } from "@/components/shop/ProductGrid";
 import type { CategoryGroup } from "@/lib/home";
 
 const EASE_OUT: Transition = { duration: 0.25, ease: "easeOut" };
 const STAGGER_S = 0.04;
-
-// Mismas clases que ProductGrid: la grilla animada se ve igual que la estática.
-const GRID = "grid grid-cols-2 gap-x-4 gap-y-12 md:grid-cols-3 md:gap-x-6 lg:grid-cols-4";
-
-const panelVariants: Variants = {
-  hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0, transition: { ...EASE_OUT, staggerChildren: STAGGER_S } },
-  exit: { opacity: 0, transition: { duration: 0.15, ease: "easeOut" } },
-};
+/** Tope de la cascada: con la entrada de 250 ms, toda la animación termina dentro de 400 ms. */
+const STAGGER_TOTAL_S = 0.15;
 
 const cardVariants: Variants = {
   hidden: { opacity: 0, y: 8 },
   show: { opacity: 1, y: 0, transition: EASE_OUT },
 };
+
+/** Solo las tarjetas se animan; la grilla únicamente reparte la cascada entre ellas. */
+function gridVariants(cards: number): Variants {
+  const staggerChildren = Math.min(STAGGER_S, STAGGER_TOTAL_S / Math.max(cards - 1, 1));
+  return { hidden: {}, show: { transition: { staggerChildren } } };
+}
 
 const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
@@ -40,6 +39,9 @@ export function CategoryTabs({ groups }: CategoryTabsProps) {
 function Tabs({ groups }: CategoryTabsProps) {
   const uid = useId();
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const panelsRef = useRef<HTMLDivElement>(null);
+  // Alto del panel saliente, retenido hasta que termina la entrada: el contenido de abajo no salta mientras se anima.
+  const [holdHeight, setHoldHeight] = useState<number | undefined>(undefined);
   const [activeSlug, setActiveSlug] = useState(groups[0].category.slug);
   // Si el grupo activo desaparece de la lista, vuelve a la primera pestaña.
   const active = groups.find((group) => group.category.slug === activeSlug) ?? groups[0];
@@ -50,7 +52,9 @@ function Tabs({ groups }: CategoryTabsProps) {
   const panelId = (slug: string) => `${uid}-panel-${slug}`;
 
   function select(index: number, { focus = false } = {}) {
-    setActiveSlug(groups[index].category.slug);
+    const slug = groups[index].category.slug;
+    if (slug !== active.category.slug) setHoldHeight(panelsRef.current?.offsetHeight);
+    setActiveSlug(slug);
     if (focus) tabRefs.current[index]?.focus();
   }
 
@@ -132,7 +136,7 @@ function Tabs({ groups }: CategoryTabsProps) {
                   layoutId={`${uid}-indicador`}
                   aria-hidden="true"
                   transition={EASE_OUT}
-                  className="absolute inset-x-0 -bottom-px h-0.5 bg-accent"
+                  className="absolute inset-x-0 bottom-0 h-0.5 bg-accent"
                 />
               ) : null}
             </button>
@@ -141,46 +145,45 @@ function Tabs({ groups }: CategoryTabsProps) {
       </div>
 
       {/*
-        Todos los paneles están en el HTML del servidor: los inactivos con `hidden`, así sin JS se ve el
-        de la primera categoría y los demás existen. Solo el activo se anima (fundido + cascada de
-        tarjetas); con `initial={false}` el primer render no parte de opacidad 0.
+        Un `tabpanel` persistente por categoría, todos en el HTML del servidor: los inactivos con `hidden`,
+        así sin JS se ve el de la primera y los demás existen. Las tarjetas solo se montan en el panel
+        activo y entran con una cascada; `initial={false}` evita que el primer render parta de opacidad 0.
       */}
-      {groups
-        .filter((group) => group !== active)
-        .map(({ category, products }) => (
-          <div
-            key={category.slug}
-            role="tabpanel"
-            id={panelId(category.slug)}
-            aria-labelledby={tabId(category.slug)}
-            tabIndex={0}
-            hidden
-          >
-            <ProductGrid products={products} headingLevel={3} />
-          </div>
-        ))}
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={active.category.slug}
-          role="tabpanel"
-          id={panelId(active.category.slug)}
-          aria-labelledby={tabId(active.category.slug)}
-          tabIndex={0}
-          variants={panelVariants}
-          initial="hidden"
-          animate="show"
-          exit="exit"
-          className={`rounded-sm ${focusRing}`}
-        >
-          <ul className={GRID}>
-            {active.products.map((product) => (
-              <motion.li key={product.id} variants={cardVariants}>
-                <ProductCard product={product} headingLevel={3} />
-              </motion.li>
-            ))}
-          </ul>
-        </motion.div>
-      </AnimatePresence>
+      <div ref={panelsRef} style={{ minHeight: holdHeight }}>
+        {groups.map(({ category, products }) => {
+          const selected = category === active.category;
+          return (
+            <div
+              key={category.slug}
+              role="tabpanel"
+              id={panelId(category.slug)}
+              aria-labelledby={tabId(category.slug)}
+              tabIndex={0}
+              hidden={!selected}
+              className={`rounded-sm ${focusRing}`}
+            >
+              <AnimatePresence initial={false}>
+                {selected ? (
+                  <motion.ul
+                    key="grid"
+                    className={PRODUCT_GRID_CLASS}
+                    variants={gridVariants(products.length)}
+                    initial="hidden"
+                    animate="show"
+                    onAnimationComplete={() => setHoldHeight(undefined)}
+                  >
+                    {products.map((product) => (
+                      <motion.li key={product.id} variants={cardVariants}>
+                        <ProductCard product={product} headingLevel={3} />
+                      </motion.li>
+                    ))}
+                  </motion.ul>
+                ) : null}
+              </AnimatePresence>
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }

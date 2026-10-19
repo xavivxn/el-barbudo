@@ -1,6 +1,7 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ImgHTMLAttributes } from "react";
+import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CategoryTabs } from "@/components/shop/home/CategoryTabs";
 import { groupByCategory } from "@/lib/home";
@@ -118,8 +119,12 @@ describe("CategoryTabs", () => {
 
     const panel = await screen.findByRole("tabpanel", { name: "Cabello" });
     expect(within(panel).getAllByRole("heading", { level: 3 })).toHaveLength(2);
-    // El panel anterior sale con su animación y queda oculto.
-    await waitFor(() => expect(screen.queryByRole("tabpanel", { name: "Perfumes" })).not.toBeInTheDocument());
+    // Cada categoría conserva su único tabpanel (id estable): el anterior solo pasa a `hidden`.
+    const perfumes = screen.getByRole("tab", { name: "Perfumes" });
+    const previous = document.getElementById(perfumes.getAttribute("aria-controls") ?? "");
+    expect(previous).toHaveAttribute("hidden");
+    expect(document.querySelectorAll('[role="tabpanel"]')).toHaveLength(3);
+    expect(new Set([...document.querySelectorAll("[id]")].map((el) => el.id)).size).toBe(document.querySelectorAll("[id]").length);
   });
 
   it("con una sola categoría hay una pestaña única seleccionada", () => {
@@ -135,5 +140,25 @@ describe("CategoryTabs", () => {
   it("sin categorías no renderiza nada", () => {
     const { container } = render(<CategoryTabs groups={[]} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("HTML del servidor (sin JS): todos los paneles, los inactivos ocultos, el activo visible y todos los 'Ver todos'", () => {
+    const html = renderToString(<CategoryTabs groups={groups} />);
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    const panels = [...doc.querySelectorAll('[role="tabpanel"]')];
+    expect(panels).toHaveLength(3);
+    expect(panels.map((panel) => panel.hasAttribute("hidden"))).toEqual([false, true, true]);
+    // El panel activo trae sus tarjetas y ninguna parte de opacidad 0 (invisible sin JS).
+    expect(panels[0].querySelectorAll("li")).toHaveLength(2);
+    expect(html).not.toMatch(/opacity:\s*0\s*[;"]/);
+
+    const seeAll = [...doc.querySelectorAll("a")].filter((link) => link.textContent?.startsWith("Ver todos"));
+    expect(seeAll.map((link) => link.getAttribute("href"))).toEqual([
+      "/productos?categoria=perfumes",
+      "/productos?categoria=barba",
+      "/productos?categoria=cabello",
+    ]);
+    expect(seeAll.map((link) => link.hasAttribute("hidden"))).toEqual([false, true, true]);
   });
 });
