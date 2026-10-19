@@ -65,7 +65,8 @@ describe("CategoryTabs", () => {
 
     const panel = screen.getByRole("tabpanel", { name: "Perfumes" });
     expect(panel).toBeVisible();
-    expect(panel).toHaveAttribute("tabindex", "0");
+    // El panel tiene enlaces: no necesita su propio tabindex (APG).
+    expect(panel).not.toHaveAttribute("tabindex");
     expect(tabs[0]).toHaveAttribute("aria-controls", panel.id);
     expect(within(panel).getByRole("heading", { level: 3, name: "Noche de Cuero" })).toBeInTheDocument();
 
@@ -127,6 +128,15 @@ describe("CategoryTabs", () => {
     expect(new Set([...document.querySelectorAll("[id]")].map((el) => el.id)).size).toBe(document.querySelectorAll("[id]").length);
   });
 
+  it("muestra la propuesta de valor y un enlace a todo el catálogo", () => {
+    render(<CategoryTabs groups={groups} />);
+
+    expect(screen.getByText("Elegí, pedí por WhatsApp y te confirmamos al toque.")).toBeVisible();
+    const catalogLink = screen.getByRole("link", { name: "Ver todo el catálogo" });
+    expect(catalogLink).toHaveAttribute("href", "/productos");
+    expect(catalogLink).toBeVisible();
+  });
+
   it("con una sola categoría hay una pestaña única seleccionada", () => {
     render(<CategoryTabs groups={[groups[1]]} />);
 
@@ -166,5 +176,7 @@ describe("CategoryTabs", () => {
       "/productos?categoria=cabello",
     ]);
     expect(seeAll.map((link) => link.hasAttribute("hidden"))).toEqual([false, true, true]);
+    expect(doc.querySelector('a[href="/productos"]')?.textContent).toBe("Ver todo el catálogo");
+    expect(panels.every((panel) => !panel.hasAttribute("tabindex"))).toBe(true);
   });
 });

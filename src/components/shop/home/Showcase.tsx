@@ -1,21 +1,25 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, Pause, Play } from "lucide-react";
-import { type MotionValue, motion, useScroll, useTransform } from "motion/react";
+import { type MotionValue, motion, useInView, useScroll, useTransform } from "motion/react";
 import {
   type CSSProperties,
   type FocusEvent,
   type KeyboardEvent,
   useEffect,
   useEffectEvent,
+  useId,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
 import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/Button";
+import { focusRing } from "@/components/ui/focus";
+import { IconButton } from "@/components/ui/IconButton";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
+import { usePrefersReducedMotion } from "@/lib/hooks/usePrefersReducedMotion";
 import { cardPricing } from "@/lib/pricing";
 import { wrapIndex } from "@/lib/showcase";
 import { toneFor } from "@/lib/tone";
@@ -33,10 +37,6 @@ const PARALLAX_PX = 24;
 const IMAGE_AREA_HEIGHT = "h-[38svh] min-h-60 md:h-[520px]";
 const IMAGE_SIZES = "(min-width: 1024px) 336px, (min-width: 768px) 272px, 60vw";
 
-const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
-// Sin `display`: cada botón pone el suyo (las flechas van `hidden md:inline-flex`).
-const controlButton = `h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line text-fg transition-colors duration-200 hover:border-fg hover:bg-fg hover:text-bg ${focusRing}`;
-
 // En móvil los dos CTA comparten una fila de ~150 px cada uno: menos padding que el `md` del Button
 // (con `!`, porque la clase de tamaño del Button gana por orden en el CSS).
 const ctaFit = "gap-1.5! px-3! whitespace-nowrap md:gap-2! md:px-5! lg:px-7!";
@@ -47,22 +47,6 @@ const PROGRESS_CLASS: Record<Progress, string> = {
   full: "scale-x-100",
   empty: "scale-x-0",
 };
-
-const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
-
-function subscribeReducedMotion(onChange: () => void) {
-  const query = window.matchMedia(REDUCED_MOTION);
-  query.addEventListener?.("change", onChange);
-  return () => query.removeEventListener?.("change", onChange);
-}
-
-function usePrefersReducedMotion() {
-  return useSyncExternalStore(
-    subscribeReducedMotion,
-    () => window.matchMedia(REDUCED_MOTION).matches,
-    () => false,
-  );
-}
 
 function subscribeVisibility(onChange: () => void) {
   document.addEventListener("visibilitychange", onChange);
@@ -92,6 +76,7 @@ export function Showcase({ products }: ShowcaseProps) {
 
 function ShowcaseCarousel({ products }: ShowcaseProps) {
   const count = products.length;
+  const trackId = `${useId()}-riel`;
   const sectionRef = useRef<HTMLElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -107,10 +92,13 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
   const [focusedWithin, setFocusedWithin] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
   const hidden = useDocumentHidden();
+  // Fuera de la pantalla no gira: al volver, la diapositiva que el usuario dejó sigue ahí.
+  const inView = useInView(sectionRef);
   // Sin JS todas las diapositivas quedan usables con scroll-snap; `inert` llega con la hidratación.
   const hydrated = useHydrated();
 
-  const playing = count > 1 && !reducedMotion && !paused && !hovered && !focusedWithin && !hidden;
+  const playing =
+    count > 1 && !reducedMotion && inView && !paused && !hovered && !focusedWithin && !hidden;
 
   // Parallax leve de la foto mientras la vitrina cruza la pantalla (nunca con reduced motion).
   const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start end", "end start"] });
@@ -245,7 +233,7 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
             <div
               key={product.id}
               style={{ "--tone-light": tone.light, "--tone-dark": tone.dark } as CSSProperties}
-              className={`absolute inset-0 bg-[radial-gradient(closest-side,var(--tone)_0%,var(--tone)_50%,transparent_100%)] transition-opacity duration-400 ease-out [--tone:var(--tone-light)] dark:[--tone:var(--tone-dark)] ${
+              className={`absolute inset-0 bg-[radial-gradient(closest-side,var(--tone)_0%,var(--tone)_70%,transparent_100%)] transition-opacity duration-400 ease-out [--tone:var(--tone-light)] dark:[--tone:var(--tone-dark)] ${
                 index === active ? "opacity-100" : "opacity-0"
               }`}
             />
@@ -258,19 +246,19 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
         la derecha, sobre el área de la foto (nunca sobre el texto), en móvil y en desktop.
       */}
       {count > 1 && !reducedMotion ? (
-        <button
+        <IconButton
           ref={rotationRef}
-          type="button"
-          aria-label={paused ? "Reanudar" : "Pausar"}
+          label={paused ? "Reanudar" : "Pausar"}
           onClick={togglePaused}
-          className={`${controlButton} absolute top-2 right-2 z-10 inline-flex bg-surface md:top-5 md:right-5`}
+          className="absolute top-2 right-2 z-10 bg-surface md:top-5 md:right-5"
         >
           {paused ? <Play size={18} aria-hidden="true" /> : <Pause size={18} aria-hidden="true" />}
-        </button>
+        </IconButton>
       ) : null}
 
       <div
         ref={trackRef}
+        id={trackId}
         onScroll={onTrackScroll}
         aria-live={playing ? "off" : "polite"}
         className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -319,22 +307,15 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
             })}
           </div>
 
-          <button
-            type="button"
-            aria-label="Anterior"
-            onClick={() => goTo(active - 1)}
-            className={`${controlButton} hidden md:inline-flex`}
-          >
-            <ArrowLeft size={18} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            aria-label="Siguiente"
-            onClick={() => goTo(active + 1)}
-            className={`${controlButton} hidden md:inline-flex`}
-          >
-            <ArrowRight size={18} aria-hidden="true" />
-          </button>
+          {/* Solo escritorio: en móvil se desliza con el dedo o se usan las barras. */}
+          <div className="hidden gap-3 md:flex">
+            <IconButton label="Destacado anterior" aria-controls={trackId} onClick={() => goTo(active - 1)}>
+              <ArrowLeft size={18} aria-hidden="true" />
+            </IconButton>
+            <IconButton label="Destacado siguiente" aria-controls={trackId} onClick={() => goTo(active + 1)}>
+              <ArrowRight size={18} aria-hidden="true" />
+            </IconButton>
+          </div>
         </div>
       ) : null}
     </section>
@@ -444,6 +425,8 @@ function Slide({ ref, product, index, count, active, inert, parallaxY }: SlidePr
               alt=""
               fill
               preload={index === 0}
+              // La 2 es la próxima en entrar (auto-avance o swipe): sin esperar al lazy-load. De la 3 en adelante, diferidas.
+              loading={index === 1 ? "eager" : undefined}
               sizes={IMAGE_SIZES}
               className={`object-cover ${soldOut ? "opacity-60" : ""}`}
             />

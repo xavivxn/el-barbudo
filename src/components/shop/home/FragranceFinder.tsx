@@ -4,7 +4,10 @@ import { ArrowLeft, ArrowRight, Moon, RotateCcw, Sun } from "lucide-react";
 import { motion } from "motion/react";
 import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 import { ProductCard } from "@/components/shop/ProductCard";
+import { focusRing } from "@/components/ui/focus";
+import { IconButton } from "@/components/ui/IconButton";
 import { type FinderQuery, matchFragrances } from "@/lib/finder";
+import { usePrefersReducedMotion } from "@/lib/hooks/usePrefersReducedMotion";
 import type { ProductDTO } from "@/lib/types";
 
 type Moment = NonNullable<FinderQuery["moment"]>;
@@ -25,12 +28,12 @@ const RAIL_GAP_PX = 16;
 /** Cascada de entrada acotada: con 200 ms por tarjeta, todo termina antes de 400 ms. */
 const STAGGER_S = 0.03;
 const STAGGER_MAX = 5;
+/** Las tarjetas del riel miden 180 px (220 px desde md): la foto se pide a ese ancho. */
+const RAIL_CARD_SIZES = "(min-width: 768px) 220px, 180px";
 
-const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const chipBase = `inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-5 text-base transition-colors duration-200 ${focusRing}`;
 const chipTone = (pressed: boolean) =>
   pressed ? "border-fg bg-fg text-bg" : "border-line text-fg hover:border-fg";
-const arrowButton = `inline-flex h-11 w-11 items-center justify-center rounded-full border border-line text-fg transition-[color,background-color,border-color,opacity] duration-200 ${focusRing}`;
 
 type FragranceFinderProps = {
   /** Solo perfumes activos: la página pasa `products.filter((p) => p.category === "perfume")`. */
@@ -52,6 +55,8 @@ function Finder({ perfumes }: FragranceFinderProps) {
   const firstChipRef = useRef<HTMLButtonElement>(null);
   const railRef = useRef<HTMLUListElement>(null);
   const [edges, setEdges] = useState({ prev: false, next: false });
+  const reducedMotion = usePrefersReducedMotion();
+  const railId = `${uid}-riel`;
 
   const { exact, results } = matchFragrances(perfumes, { moment, styles });
   const hasSelection = moment !== undefined || styles.length > 0;
@@ -106,8 +111,7 @@ function Finder({ perfumes }: FragranceFinderProps) {
     if (!rail || !(direction === 1 ? edges.next : edges.prev)) return;
     const card = rail.firstElementChild as HTMLElement | null;
     const step = (card?.offsetWidth ?? rail.clientWidth) + RAIL_GAP_PX;
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    rail.scrollBy({ left: direction * step, behavior: reduce ? "auto" : "smooth" });
+    rail.scrollBy({ left: direction * step, behavior: reducedMotion ? "auto" : "smooth" });
   }
 
   const canScroll = edges.prev || edges.next;
@@ -170,8 +174,11 @@ function Finder({ perfumes }: FragranceFinderProps) {
 
       <div className="mt-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-line pt-6 md:mt-10">
         <div role="status" className="min-h-11 content-center">
+          {/* Antes de elegir no hay nada "para vos": se muestra el catálogo de perfumes entero. */}
           <p className="font-medium">
-            {results.length} {results.length === 1 ? "perfume" : "perfumes"} para vos
+            {hasSelection
+              ? `${results.length} ${results.length === 1 ? "perfume" : "perfumes"} para vos`
+              : `Todos nuestros perfumes (${results.length})`}
           </p>
           {exact ? null : <p className="text-muted">No hay uno exacto; estos se acercan.</p>}
         </div>
@@ -189,37 +196,37 @@ function Finder({ perfumes }: FragranceFinderProps) {
           ) : null}
           {/* Solo escritorio y solo si el riel se desplaza; en un extremo la flecha queda inactiva sin perder el foco. */}
           <div hidden={!canScroll} className="hidden gap-2 md:flex">
-            <button
-              type="button"
-              aria-label="Anterior"
-              aria-controls={`${uid}-riel`}
-              aria-disabled={!edges.prev}
+            <IconButton
+              label="Perfumes anteriores"
+              aria-controls={railId}
+              disabled={!edges.prev}
               onClick={() => scrollRail(-1)}
-              className={`${arrowButton} ${edges.prev ? "cursor-pointer hover:border-fg hover:bg-fg hover:text-bg" : "cursor-not-allowed opacity-40"}`}
             >
               <ArrowLeft size={18} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              aria-label="Siguiente"
-              aria-controls={`${uid}-riel`}
-              aria-disabled={!edges.next}
+            </IconButton>
+            <IconButton
+              label="Perfumes siguientes"
+              aria-controls={railId}
+              disabled={!edges.next}
               onClick={() => scrollRail(1)}
-              className={`${arrowButton} ${edges.next ? "cursor-pointer hover:border-fg hover:bg-fg hover:text-bg" : "cursor-not-allowed opacity-40"}`}
             >
               <ArrowRight size={18} aria-hidden="true" />
-            </button>
+            </IconButton>
           </div>
         </div>
       </div>
 
-      {/* El riel se desplaza dentro de la tarjeta: la página nunca gana scroll horizontal. */}
+      {/*
+        El riel se desplaza dentro de la tarjeta: la página nunca gana scroll horizontal. `relative` lo
+        hace bloque contenedor de los `sr-only` (absolutos) de las tarjetas fuera de vista; sin eso,
+        escapan del recorte y estiran la página (p. ej. el "Consultar" de un agotado al final).
+      */}
       <ul
         ref={railRef}
-        id={`${uid}-riel`}
+        id={railId}
         aria-label="Perfumes sugeridos"
         onScroll={updateEdges}
-        className="-mx-4 mt-4 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto overscroll-x-contain px-4 pb-2 md:-mx-10 md:mt-6 md:scroll-px-10 md:px-10"
+        className="relative -mx-4 mt-4 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto overscroll-x-contain px-4 pb-2 md:-mx-10 md:mt-6 md:scroll-px-10 md:px-10"
       >
         {results.map((product, index) => (
           <motion.li
@@ -229,7 +236,7 @@ function Finder({ perfumes }: FragranceFinderProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2, ease: "easeOut", delay: Math.min(index, STAGGER_MAX) * STAGGER_S }}
           >
-            <ProductCard product={product} headingLevel={3} />
+            <ProductCard product={product} headingLevel={3} sizes={RAIL_CARD_SIZES} />
           </motion.li>
         ))}
       </ul>

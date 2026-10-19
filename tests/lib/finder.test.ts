@@ -38,14 +38,25 @@ describe("matchFragrances", () => {
     });
   });
 
-  it("sin selección muestra los destacados (solo perfumes)", () => {
-    const result = matchFragrances(all, { styles: [] });
+  it("sin selección muestra todos los perfumes: disponibles primero y, dentro de cada grupo, los destacados al final", () => {
+    const plainA = product("plain-a", {});
+    const plainB = product("plain-b", {});
+    const featuredSoldOut = product("destacado-agotado", { featured: true, variants: outOfStock });
+    const result = matchFragrances([nocheAmaderado, featuredSoldOut, plainA, nocheDulceAgotado, diaFresco, plainB, barbaNoche], {
+      styles: [],
+    });
     expect(result.exact).toBe(true);
-    expect(result.results.map((p) => p.id)).toEqual([nocheAmaderado.id, diaFresco.id]);
-    expect(result.results.every((p) => p.featured)).toBe(true);
+    expect(result.results.map((p) => p.id)).toEqual([
+      plainA.id,
+      plainB.id,
+      nocheAmaderado.id,
+      diaFresco.id,
+      nocheDulceAgotado.id,
+      featuredSoldOut.id,
+    ]);
   });
 
-  it("sin selección ni destacados muestra todos los perfumes", () => {
+  it("sin selección ni destacados muestra todos los perfumes en su orden", () => {
     const plain = [product("x", {}), product("y", {}), barbaNoche];
     expect(matchFragrances(plain, { styles: [] })).toEqual({ exact: true, results: [plain[0], plain[1]] });
   });

@@ -14,9 +14,11 @@ export function matchFragrances(
 ): { exact: boolean; results: ProductDTO[] } {
   const perfumes = products.filter((product) => product.category === "perfume");
 
+  // Sin elección: todos los perfumes. Los destacados van al final de cada grupo porque ya están en
+  // la vitrina; los disponibles siguen primero.
   if (!q.moment && q.styles.length === 0) {
-    const featured = perfumes.filter((product) => product.featured);
-    return { exact: true, results: availableFirst(featured.length > 0 ? featured : perfumes) };
+    const featuredLast = [...perfumes].sort((a, b) => Number(a.featured) - Number(b.featured));
+    return { exact: true, results: availableFirst(featuredLast) };
   }
 
   const scored = perfumes.map((product) => {

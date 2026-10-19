@@ -6,6 +6,8 @@ import Link from "next/link";
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { PRODUCT_GRID_CLASS, ProductGrid } from "@/components/shop/ProductGrid";
+import { Button } from "@/components/ui/Button";
+import { focusRing } from "@/components/ui/focus";
 import type { CategoryGroup } from "@/lib/home";
 
 const EASE_OUT: Transition = { duration: 0.25, ease: "easeOut" };
@@ -25,8 +27,6 @@ function gridVariants(cards: number): Variants {
   const staggerChildren = Math.min(STAGGER_S, STAGGER_TOTAL_S / Math.max(cards - 1, 1));
   return { hidden: {}, show: { transition: { staggerChildren } } };
 }
-
-const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 type CategoryTabsProps = {
   /** La salida de `groupByCategory`: sin grupos vacíos, así que cada grupo es una pestaña. */
@@ -100,9 +100,12 @@ function Tabs({ groups }: CategoryTabsProps) {
   return (
     <section aria-labelledby={titleId}>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-x-6 md:mb-6">
-        <h2 id={titleId} className="font-serif text-3xl leading-tight font-medium md:text-4xl">
-          Explorá la tienda
-        </h2>
+        <div>
+          <h2 id={titleId} className="font-serif text-3xl leading-tight font-medium md:text-4xl">
+            Explorá la tienda
+          </h2>
+          <p className="mt-1 text-muted">Elegí, pedí por WhatsApp y te confirmamos al toque.</p>
+        </div>
         {/* Un enlace por categoría (también sin JS, en el HTML); solo se ve el de la pestaña activa. */}
         {groups.map(({ category, total }) => (
           <Link
@@ -162,7 +165,8 @@ function Tabs({ groups }: CategoryTabsProps) {
         Un `tabpanel` persistente por categoría, todos en el HTML del servidor: los inactivos con `hidden`,
         así sin JS se ve el de la primera y los demás existen con sus tarjetas (enlaces para buscadores).
         Solo el panel activo usa la grilla animada, que entra con una cascada; los ocultos llevan la grilla
-        estática. `initial={false}` evita que el primer render parta de opacidad 0.
+        estática. `initial={false}` evita que el primer render parta de opacidad 0. Sin `tabIndex`: cada
+        panel tiene enlaces, que ya son la primera parada de Tab después de la pestaña (APG).
       */}
       <div ref={panelsRef} style={{ minHeight: holdHeight }}>
         {groups.map(({ category, products }) => {
@@ -173,9 +177,7 @@ function Tabs({ groups }: CategoryTabsProps) {
               role="tabpanel"
               id={panelId(category.slug)}
               aria-labelledby={tabId(category.slug)}
-              tabIndex={0}
               hidden={!selected}
-              className={`rounded-sm ${focusRing}`}
             >
               <AnimatePresence initial={false}>
                 {selected ? (
@@ -199,6 +201,13 @@ function Tabs({ groups }: CategoryTabsProps) {
             </div>
           );
         })}
+      </div>
+
+      <div className="mt-10 flex justify-center md:mt-12">
+        <Button variant="secondary" href="/productos">
+          Ver todo el catálogo
+          <ArrowRight size={18} aria-hidden="true" />
+        </Button>
       </div>
     </section>
   );

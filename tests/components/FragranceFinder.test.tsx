@@ -2,7 +2,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ImgHTMLAttributes } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FragranceFinder } from "@/components/shop/home/FragranceFinder";
 import type { ProductDTO } from "@/lib/types";
 
@@ -19,7 +19,22 @@ vi.mock("next/image", () => ({
   },
 }));
 
-afterEach(cleanup);
+const originalMatchMedia = window.matchMedia;
+
+beforeEach(() => {
+  // jsdom no implementa matchMedia (lo usa el hook de reduced motion).
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  })) as unknown as typeof window.matchMedia;
+});
+
+afterEach(() => {
+  cleanup();
+  window.matchMedia = originalMatchMedia;
+});
 
 const inStock = [{ id: "v", label: "50 ml", price: 100000, stock: 3 }];
 const outOfStock = [{ id: "v", label: "50 ml", price: 100000, stock: 0 }];
@@ -77,14 +92,17 @@ describe("FragranceFinder", () => {
     expect(screen.queryAllByRole("button", { pressed: true })).toHaveLength(0);
   });
 
-  it("sin selección muestra los destacados, sin aviso y sin 'Limpiar'", () => {
-    render(<FragranceFinder perfumes={all} />);
+  it("sin selección muestra todos los perfumes (no promete uno para vos), sin aviso y sin 'Limpiar'", () => {
+    const plain = product("plain", { name: "Clásico" });
+    render(<FragranceFinder perfumes={[...all, plain]} />);
 
     expect(screen.getByRole("group", { name: /¿Para cuándo\?/ })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: /¿Qué estilo\?/ })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { pressed: false })).toHaveLength(8);
-    expect(screen.getByRole("status")).toHaveTextContent("2 perfumes para vos");
-    expect(cardNames()).toEqual(["Noche Amaderada", "Día Fresco"]);
+    expect(screen.getByRole("status")).toHaveTextContent("Todos nuestros perfumes (4)");
+    expect(screen.getByRole("status")).not.toHaveTextContent("para vos");
+    // Disponibles primero; los destacados (ya en la vitrina) al final de los disponibles; el agotado último.
+    expect(cardNames()).toEqual(["Clásico", "Noche Amaderada", "Día Fresco", "Noche Dulce"]);
     expect(screen.queryByText("No hay uno exacto; estos se acercan.")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Limpiar" })).not.toBeInTheDocument();
   });
@@ -112,7 +130,7 @@ describe("FragranceFinder", () => {
     await user.click(screen.getByRole("button", { name: "Limpiar" }));
     expect(screen.queryByRole("button", { name: "Limpiar" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Día" })).toHaveFocus();
-    expect(screen.getByRole("status")).toHaveTextContent("2 perfumes para vos");
+    expect(screen.getByRole("status")).toHaveTextContent("Todos nuestros perfumes (3)");
   });
 
   it("sin perfumes no renderiza nada", () => {
@@ -124,8 +142,57 @@ describe("FragranceFinder", () => {
     const html = renderToString(<FragranceFinder perfumes={all} />);
     const doc = new DOMParser().parseFromString(html, "text/html");
 
-    expect(doc.querySelectorAll("ul li h3")).toHaveLength(2);
+    expect(doc.querySelectorAll("ul li h3")).toHaveLength(3);
     expect(html).not.toMatch(/opacity:\s*0\s*[;"]/);
-    expect(doc.querySelector('[aria-label="Anterior"]')?.closest("[hidden]")).not.toBeNull();
+    for (const label of ["Perfumes anteriores", "Perfumes siguientes"]) {
+      const arrow = doc.querySelector(`[aria-label="${label}"]`);
+      expect(arrow).not.toBeNull();
+      expect(arrow?.closest("[hidden]")).not.toBeNull();
+    }
+  });
+
+  it("las tarjetas del riel piden la imagen al tamaño del riel", () => {
+    render(<FragranceFinder perfumes={all} />);
+    const images = screen.getByRole("list", { name: "Perfumes sugeridos" }).querySelectorAll("img");
+    expect(images).toHaveLength(3);
+    for (const image of images) expect(image).toHaveAttribute("sizes", "(min-width: 768px) 220px, 180px");
+  });
+
+  it("el riel contiene los textos sr-only de sus tarjetas (no estiran la página hacia el costado)", () => {
+    render(<FragranceFinder perfumes={all} />);
+    // El agotado trae un sr-only absoluto dentro de "Consultar": el riel tiene que ser su bloque contenedor.
+    expect(screen.getByRole("list", { name: "Perfumes sugeridos" })).toHaveClass("relative");
+  });
+
+  it("las flechas del riel tienen nombres propios, controlan el riel y en un extremo quedan inactivas", async () => {
+    const user = userEvent.setup();
+    const scrollBy = vi.fn();
+    const originalScrollBy = Element.prototype.scrollBy;
+    Element.prototype.scrollBy = scrollBy as unknown as typeof Element.prototype.scrollBy;
+    const sizes = [
+      vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(400),
+      vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockReturnValue(1200),
+      vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(220),
+    ];
+    try {
+      render(<FragranceFinder perfumes={all} />);
+      const rail = screen.getByRole("list", { name: "Perfumes sugeridos" });
+      const prev = screen.getByRole("button", { name: "Perfumes anteriores" });
+      const next = screen.getByRole("button", { name: "Perfumes siguientes" });
+      expect(prev).toHaveAttribute("aria-controls", rail.id);
+      expect(next).toHaveAttribute("aria-controls", rail.id);
+
+      // Al principio del riel: "anteriores" inactiva (sin `disabled`, sigue enfocable) y no desplaza.
+      expect(prev).toHaveAttribute("aria-disabled", "true");
+      expect(next).toHaveAttribute("aria-disabled", "false");
+      await user.click(prev);
+      expect(scrollBy).not.toHaveBeenCalled();
+
+      await user.click(next);
+      expect(scrollBy).toHaveBeenCalledWith({ left: 236, behavior: "smooth" });
+    } finally {
+      for (const spy of sizes) spy.mockRestore();
+      Element.prototype.scrollBy = originalScrollBy;
+    }
   });
 });

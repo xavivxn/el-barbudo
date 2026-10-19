@@ -7,6 +7,13 @@ import type { ProductDTO } from "@/lib/types";
 
 type MockImageProps = ImgHTMLAttributes<HTMLImageElement> & { fill?: boolean; preload?: boolean };
 
+// En jsdom no hay IntersectionObserver: `useInView` se controla desde cada test (por defecto, en pantalla).
+const viewport = vi.hoisted(() => ({ inView: true }));
+vi.mock("motion/react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("motion/react")>()),
+  useInView: () => viewport.inView,
+}));
+
 vi.mock("next/image", () => ({
   default: (props: MockImageProps) => {
     // `fill` y `preload` son props de next/image, no atributos de <img>.
@@ -81,6 +88,7 @@ function mockReducedMotion(reduce: boolean) {
 beforeEach(() => {
   // jsdom no implementa scrollTo ni matchMedia.
   scrollTo.mockClear();
+  viewport.inView = true;
   Element.prototype.scrollTo = scrollTo as unknown as typeof Element.prototype.scrollTo;
   mockReducedMotion(false);
 });
@@ -116,7 +124,7 @@ describe("Showcase", () => {
     expect(screen.getByRole("group", { name: "2 de 3" })).toHaveAttribute("inert");
     expect(screen.getByRole("button", { name: "Ir al destacado 1" })).toHaveAttribute("aria-current", "true");
 
-    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    await user.click(screen.getByRole("button", { name: "Destacado siguiente" }));
     expect(screen.getByRole("button", { name: "Ir al destacado 2" })).toHaveAttribute("aria-current", "true");
     expect(screen.getByRole("button", { name: "Ir al destacado 1" })).not.toHaveAttribute("aria-current");
     expect(screen.getByRole("group", { name: "2 de 3" })).not.toHaveAttribute("inert");
@@ -130,12 +138,33 @@ describe("Showcase", () => {
     await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
     expect(screen.getByRole("button", { name: "Ir al destacado 1" })).toHaveAttribute("aria-current", "true");
 
-    // Circular: desde la primera, "Anterior" va a la última.
-    await user.click(screen.getByRole("button", { name: "Anterior" }));
+    // Circular: desde la primera, "Destacado anterior" va a la última.
+    await user.click(screen.getByRole("button", { name: "Destacado anterior" }));
     expect(screen.getByRole("button", { name: "Ir al destacado 3" })).toHaveAttribute("aria-current", "true");
 
     await user.click(screen.getByRole("button", { name: "Ir al destacado 2" }));
     expect(activeSlide()).toHaveAccessibleName("2 de 3");
+  });
+
+  it("las flechas tienen nombres propios de la vitrina y controlan el riel de diapositivas", () => {
+    render(<Showcase products={[p1, p2, p3]} />);
+    const track = screen.getByRole("group", { name: "1 de 3" }).parentElement as HTMLElement;
+
+    expect(track.id).not.toBe("");
+    for (const name of ["Destacado anterior", "Destacado siguiente"]) {
+      expect(screen.getByRole("button", { name })).toHaveAttribute("aria-controls", track.id);
+    }
+    expect(screen.queryByRole("button", { name: "Anterior" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Siguiente" })).not.toBeInTheDocument();
+  });
+
+  it("la foto de la diapositiva 2 carga ya (eager); de la 3 en adelante, diferida", () => {
+    render(<Showcase products={[p1, p2, p3, soldOutNoPhoto, product({ id: "p5", slug: "p5", name: "Quinto" })]} />);
+    const image = (n: number) => screen.getByRole("group", { name: `${n} de 5` }).querySelector("img");
+
+    expect(image(2)).toHaveAttribute("loading", "eager");
+    expect(image(3)).not.toHaveAttribute("loading", "eager");
+    expect(image(5)).not.toHaveAttribute("loading", "eager");
   });
 
   it("muestra nombre, hasta 2 etiquetas, la salida, el precio y los pedidos de la diapositiva", () => {
@@ -222,10 +251,10 @@ describe("Showcase", () => {
 
     await user.click(screen.getByRole("button", { name: "Ir al destacado 3" }));
     expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: "auto" }));
-    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    await user.click(screen.getByRole("button", { name: "Destacado siguiente" }));
     expect(screen.getByRole("button", { name: "Ir al destacado 1" })).toHaveAttribute("aria-current", "true");
     expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: "auto" }));
-    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    await user.click(screen.getByRole("button", { name: "Destacado siguiente" }));
     expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: "smooth" }));
   });
 
@@ -336,6 +365,24 @@ describe("Showcase", () => {
       expect(activeSlide()).toHaveAccessibleName("2 de 3");
     });
 
+    it("no avanza mientras la vitrina está fuera de la pantalla y arranca al volver", () => {
+      vi.useFakeTimers();
+      viewport.inView = false;
+      const { rerender } = render(<Showcase products={[p1, p2, p3]} />);
+
+      act(() => vi.advanceTimersByTime(12000));
+      expect(activeSlide()).toHaveAccessibleName("1 de 3");
+      // Sin rotación, la barra activa queda llena (no corre).
+      expect(
+        screen.getByRole("button", { name: "Ir al destacado 1" }).querySelector("[data-progress]"),
+      ).toHaveAttribute("data-progress", "full");
+
+      viewport.inView = true;
+      rerender(<Showcase products={[p1, p2, p3]} />);
+      act(() => vi.advanceTimersByTime(6000));
+      expect(activeSlide()).toHaveAccessibleName("2 de 3");
+    });
+
     it("se pausa con la pestaña oculta", () => {
       vi.useFakeTimers();
       const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
@@ -359,7 +406,7 @@ describe("Showcase", () => {
       expect(activeSlide()).toHaveAccessibleName("1 de 3");
       expect(screen.queryByRole("button", { name: "Pausar" })).not.toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Siguiente" }));
+      await user.click(screen.getByRole("button", { name: "Destacado siguiente" }));
       expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: "auto" }));
     });
   });
