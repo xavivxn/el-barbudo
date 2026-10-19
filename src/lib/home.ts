@@ -9,8 +9,9 @@ export type CategoryGroup = {
 
 /**
  * Secciones de la portada: en el orden de CATEGORIES, hasta `perSection` productos por sección.
- * `exclude` (ids) deja afuera lo que ya se mostró, por ejemplo en "Destacados"; la sección que
- * queda sin productos se omite.
+ * `exclude` (ids) deja afuera lo que ya se mostró, por ejemplo en la vitrina. Si excluir deja vacía
+ * una categoría que sí tiene productos, se muestran los suyos sin excluir: la pestaña nunca
+ * desaparece por la vitrina. Solo se omite la categoría sin ningún producto.
  */
 export function groupByCategory(
   products: ProductDTO[],
@@ -19,8 +20,9 @@ export function groupByCategory(
 ): CategoryGroup[] {
   return CATEGORIES.flatMap((category) => {
     const inCategory = products.filter((product) => product.category === category.value);
-    const shown = inCategory.filter((product) => !exclude.has(product.id)).slice(0, perSection);
-    if (shown.length === 0) return [];
+    if (inCategory.length === 0) return [];
+    const remaining = inCategory.filter((product) => !exclude.has(product.id));
+    const shown = (remaining.length > 0 ? remaining : inCategory).slice(0, perSection);
     return [{ category, products: shown, total: inCategory.length }];
   });
 }

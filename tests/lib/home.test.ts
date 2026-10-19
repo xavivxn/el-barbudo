@@ -67,9 +67,17 @@ describe("groupByCategory", () => {
     expect(groups[0].total).toBe(5);
   });
 
-  it("omite la sección que queda vacía después de excluir", () => {
-    const groups = groupByCategory([perfume1, barba1], 4, new Set(["barba1"]));
-    expect(groups.map((g) => g.category.value)).toEqual(["perfume"]);
+  it("si excluir vacía una categoría con productos, la muestra sin excluir (la pestaña no desaparece)", () => {
+    const groups = groupByCategory([perfume1, perfume2, barba1], 4, new Set(["perfume1", "perfume2", "barba1"]));
+    expect(groups.map((g) => g.category.value)).toEqual(["perfume", "barba"]);
+    expect(groups[0].products.map((p) => p.id)).toEqual(["perfume1", "perfume2"]);
+    expect(groups[0].total).toBe(2);
+    expect(groups[1].products).toEqual([barba1]);
+  });
+
+  it("el respaldo sin excluir también respeta perSection", () => {
+    const [perfumes] = groupByCategory([perfume1, perfume2, perfume3], 2, new Set(["perfume1", "perfume2", "perfume3"]));
+    expect(perfumes.products.map((p) => p.id)).toEqual(["perfume1", "perfume2"]);
   });
 
   it("respeta perSection", () => {

@@ -12,6 +12,10 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   // Solo activos: el buscador y la vitrina confían en que la lista ya viene filtrada.
   const products = await listProducts();
+  const showcase = pickShowcase(products);
+  // Las pestañas no repiten lo que ya está en la vitrina (Ruling R8); "Ver todos (N)" sigue contando todo.
+  const groups = groupByCategory(products, 8, new Set(showcase.map((product) => product.id)));
+  const perfumes = products.filter((product) => product.category === "perfume");
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-8 md:px-8 md:pb-10">
@@ -23,16 +27,19 @@ export default async function HomePage() {
         <>
           {/* Sobre el pliegue: sin Reveal, se ve aunque no haya JS. */}
           <div className="pt-4 md:pt-8">
-            <Showcase products={pickShowcase(products)} />
+            <Showcase products={showcase} />
           </div>
 
           <div className="mt-16 space-y-16 md:mt-24 md:space-y-24">
             <Reveal>
-              <CategoryTabs groups={groupByCategory(products, 8)} />
+              <CategoryTabs groups={groups} />
             </Reveal>
-            <Reveal>
-              <FragranceFinder perfumes={products.filter((product) => product.category === "perfume")} />
-            </Reveal>
+            {/* Sin perfumes no hay buscador: tampoco su Reveal, que dejaría un hueco doble. */}
+            {perfumes.length > 0 ? (
+              <Reveal>
+                <FragranceFinder perfumes={perfumes} />
+              </Reveal>
+            ) : null}
           </div>
         </>
       )}

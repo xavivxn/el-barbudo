@@ -21,10 +21,16 @@ describe("toneFor", () => {
     expect(toneFor({ tags: ["día", "suave"] }).key).toBe("bronce");
   });
 
-  it("usa los colores exactos", () => {
-    const { light, dark } = toneFor({ tags: ["fresco"] });
-    expect(light).toBe("#DCE6EE");
-    expect(dark).toBe("#1F3A52");
-    expect(toneFor({ tags: [] })).toEqual({ key: "bronce", light: "#EDE3D3", dark: "#33291E" });
+  it("usa los colores exactos (claros más saturados para que el brillo se vea sobre la superficie blanca)", () => {
+    const colors = (tag: string) => {
+      const { light, dark } = toneFor({ tags: [tag] });
+      return [light, dark];
+    };
+    expect(colors("fresco")).toEqual(["#A9C3DC", "#1F3A52"]);
+    expect(colors("amaderado")).toEqual(["#CDB291", "#3A2A1E"]);
+    expect(colors("dulce")).toEqual(["#E6BE7E", "#47331A"]);
+    expect(colors("especiado")).toEqual(["#DBA88E", "#4A2519"]);
+    expect(colors("natural")).toEqual(["#B8C79F", "#28331F"]);
+    expect(toneFor({ tags: [] })).toEqual({ key: "bronce", light: "#D6BB8E", dark: "#33291E" });
   });
 });
