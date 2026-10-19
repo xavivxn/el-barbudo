@@ -1,12 +1,9 @@
 "use client";
 
-import { CircleAlert } from "lucide-react";
 import {
   type ChangeEvent,
   type FocusEvent,
   type FormEvent,
-  type MouseEvent,
-  type ReactNode,
   useActionState,
   useEffect,
   useRef,
@@ -15,6 +12,7 @@ import {
 } from "react";
 import type { FormState } from "@/app/admin/actions";
 import { saveService } from "@/app/admin/service-actions";
+import { ErrorSummary, Field, useFieldErrors } from "@/components/admin/form-parts";
 import { Button } from "@/components/ui/Button";
 import { formatThousands } from "@/lib/money";
 import type { ServiceDTO } from "@/lib/types";
@@ -22,82 +20,22 @@ import { fieldErrors, parseServiceForm, serviceSchema } from "@/lib/validation";
 
 const initialState: FormState = {};
 
-const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
-
 const FIELDS = ["name", "description", "price"] as const;
 type FieldName = (typeof FIELDS)[number];
 const LABELS: Record<FieldName, string> = { name: "Nombre", description: "Descripción", price: "Precio" };
 
-const inputClass = (error?: string) =>
-  `w-full rounded-lg border bg-bg px-4 text-base text-fg ${focusRing} ${error ? "border-danger" : "border-line"}`;
-
-type ControlProps = {
-  id: string;
-  name: FieldName;
-  "aria-invalid": true | undefined;
-  "aria-describedby": string | undefined;
-  className: string;
-};
-
-function Field({
-  formId,
-  name,
-  optional,
-  hint,
-  error,
-  children,
-}: {
-  formId: string;
-  name: FieldName;
-  optional?: boolean;
-  hint?: string;
-  error?: string;
-  children: (props: ControlProps) => ReactNode;
-}) {
-  const id = `${formId}-${name}`;
-  const hintId = `${id}-hint`;
-  const errorId = `${id}-error`;
-  const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ");
-  return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <label htmlFor={id} className="font-medium">
-        {LABELS[name]}
-        {optional ? <span className="font-normal text-muted"> (opcional)</span> : null}
-      </label>
-      {hint ? (
-        <p id={hintId} className="text-sm text-muted">
-          {hint}
-        </p>
-      ) : null}
-      {children({
-        id,
-        name,
-        "aria-invalid": error ? true : undefined,
-        "aria-describedby": describedBy || undefined,
-        className: inputClass(error),
-      })}
-      {error ? (
-        <p id={errorId} className="flex items-start gap-1.5 text-sm font-medium text-danger">
-          <CircleAlert size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
 type Props = {
   /** Sin `service` crea uno nuevo. */
   service?: ServiceDTO;
-  /** Orden con el que se abre el formulario; el servidor lo recalcula al crear. */
-  nextOrder: number;
   /** Id del elemento que contiene el formulario: prefijo de los ids de sus campos. */
   formId: string;
   onSaved: () => void;
+  /** El servidor devolvió errores o un mensaje: no se guardó. */
+  onFailed: () => void;
   onCancel: () => void;
 };
 
-export function ServiceForm({ service, nextOrder, formId, onSaved, onCancel }: Props) {
+export function ServiceForm({ service, formId, onSaved, onFailed, onCancel }: Props) {
   const [state, formAction, pending] = useActionState(saveService, initialState);
   const [, startTransition] = useTransition();
 
@@ -107,26 +45,20 @@ export function ServiceForm({ service, nextOrder, formId, onSaved, onCancel }: P
     price: service ? formatThousands(service.price) : "",
   });
 
-  // Las respuestas del servidor reemplazan los errores; después cada campo se valida por su cuenta.
-  const [seenState, setSeenState] = useState(state);
-  const [errors, setErrors] = useState<Record<string, string>>(state.errors ?? {});
-  if (state !== seenState) {
-    setSeenState(state);
-    setErrors(state.errors ?? {});
-  }
+  const { errors, summaryRef, validate, summaryKeys } = useFieldErrors(
+    state,
+    (form) => fieldErrors(serviceSchema.safeParse(parseServiceForm(form))),
+    (name) => (FIELDS.includes(name as FieldName) ? name : null),
+  );
 
-  const summaryRef = useRef<HTMLDivElement>(null);
+  // El padre cierra el formulario y avisa (guardó) o borra el aviso anterior (no guardó).
+  const callbacks = useRef({ onSaved, onFailed });
   useEffect(() => {
-    if (state.errors || state.message) summaryRef.current?.focus();
-  }, [state]);
-
-  // Guardó: el padre cierra el formulario y devuelve el foco.
-  const onSavedRef = useRef(onSaved);
-  useEffect(() => {
-    onSavedRef.current = onSaved;
+    callbacks.current = { onSaved, onFailed };
   });
   useEffect(() => {
-    if (state.saved) onSavedRef.current();
+    if (state.saved) callbacks.current.onSaved();
+    else if (state.errors || state.message) callbacks.current.onFailed();
   }, [state]);
 
   // Al abrirse, el foco entra al primer campo.
@@ -139,22 +71,6 @@ export function ServiceForm({ service, nextOrder, formId, onSaved, onCancel }: P
     setValues((current) => ({ ...current, [field]: value }));
   };
 
-  /** Valida un solo campo con el mismo esquema del servidor. */
-  function validate(target: EventTarget, onlyIfInvalid: boolean) {
-    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
-    const key = target.name;
-    if (!target.form || !FIELDS.includes(key as FieldName)) return;
-    if (onlyIfInvalid && !errors[key]) return;
-    const found = fieldErrors(serviceSchema.safeParse(parseServiceForm(new FormData(target.form))))[key];
-    setErrors((current) => {
-      if (current[key] === found) return current;
-      const next = { ...current };
-      if (found) next[key] = found;
-      else delete next[key];
-      return next;
-    });
-  }
-
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
@@ -163,14 +79,12 @@ export function ServiceForm({ service, nextOrder, formId, onSaved, onCancel }: P
     startTransition(() => formAction(data));
   }
 
-  // El resumen es de los errores del último envío que siguen sin corregir; los de blur solo van junto al campo.
-  const errorKeys = FIELDS.filter((key) => key in (state.errors ?? {}) && key in errors);
-  const summaryVisible = errorKeys.length > 0 || Boolean(state.message);
-
-  function jumpTo(event: MouseEvent<HTMLAnchorElement>, key: FieldName) {
-    event.preventDefault();
-    document.getElementById(`${formId}-${key}`)?.focus();
-  }
+  const summaryItems = FIELDS.filter((key) => summaryKeys.includes(key)).map((key) => ({
+    key,
+    targetId: `${formId}-${key}`,
+    label: LABELS[key],
+    error: errors[key],
+  }));
 
   return (
     <form
@@ -182,64 +96,44 @@ export function ServiceForm({ service, nextOrder, formId, onSaved, onCancel }: P
       className="flex flex-col gap-5"
     >
       {service ? <input type="hidden" name="id" value={service.id} /> : null}
-      <input type="hidden" name="order" value={service?.order ?? nextOrder} />
 
-      {summaryVisible ? (
-        <div
-          ref={summaryRef}
-          role="alert"
-          tabIndex={-1}
-          className={`border-2 border-danger bg-surface p-4 ${focusRing}`}
-        >
-          <p className="flex items-center gap-2 font-semibold text-danger">
-            <CircleAlert size={20} aria-hidden="true" className="shrink-0" />
-            {errorKeys.length > 0
-              ? errorKeys.length === 1
-                ? "Hay 1 campo para revisar"
-                : `Hay ${errorKeys.length} campos para revisar`
-              : state.message}
-          </p>
-          {errorKeys.length > 0 ? (
-            <ul className="mt-2 list-disc pl-6">
-              {errorKeys.map((key) => (
-                <li key={key}>
-                  <a
-                    href={`#${formId}-${key}`}
-                    onClick={(event) => jumpTo(event, key)}
-                    className={`underline underline-offset-4 ${focusRing}`}
-                  >
-                    {LABELS[key]}: {errors[key]}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {errorKeys.length > 0 && state.message ? <p className="mt-2">{state.message}</p> : null}
-        </div>
-      ) : null}
+      <ErrorSummary summaryRef={summaryRef} items={summaryItems} message={state.message} />
 
-      <Field formId={formId} name="name" error={errors.name}>
+      <Field id={`${formId}-name`} label={LABELS.name} error={errors.name}>
         {(a11y) => (
-          <input {...a11y} type="text" value={values.name} onChange={set("name")} autoComplete="off" className={`${a11y.className} min-h-12`} />
+          <input {...a11y} name="name" type="text" value={values.name} onChange={set("name")} autoComplete="off" />
         )}
       </Field>
 
-      <Field formId={formId} name="description" optional error={errors.description}>
+      <Field id={`${formId}-description`} label={LABELS.description} optional error={errors.description}>
         {(a11y) => (
-          <textarea {...a11y} rows={3} value={values.description} onChange={set("description")} className={`${a11y.className} py-3`} />
+          <textarea
+            {...a11y}
+            name="description"
+            rows={3}
+            value={values.description}
+            onChange={set("description")}
+            className={`${a11y.className} py-3`}
+          />
         )}
       </Field>
 
-      <Field formId={formId} name="price" hint="En guaraníes, sin decimales. Por ejemplo 120.000." error={errors.price}>
+      <Field
+        id={`${formId}-price`}
+        label={LABELS.price}
+        hint="En guaraníes, sin decimales. Por ejemplo 120.000."
+        error={errors.price}
+      >
         {(a11y) => (
           <input
             {...a11y}
+            name="price"
             type="text"
             inputMode="numeric"
             value={values.price}
             onChange={set("price")}
             autoComplete="off"
-            className={`${a11y.className} min-h-12 tabular-nums sm:max-w-56`}
+            className={`${a11y.className} tabular-nums sm:max-w-56`}
           />
         )}
       </Field>

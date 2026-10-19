@@ -24,21 +24,6 @@ describe("SavedNotice", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Producto guardado");
   });
 
-  it("con ?guardado=servicio dice que el servicio se guardó", () => {
-    nav.search = "guardado=servicio";
-    nav.path = "/admin/servicios";
-    render(<SavedNotice />);
-    expect(screen.getByRole("status")).toHaveTextContent("Servicio guardado");
-    expect(screen.getByRole("link", { name: "Cerrar aviso" })).toHaveAttribute("href", "/admin/servicios");
-    nav.path = "/admin";
-  });
-
-  it("un valor desconocido de guardado no muestra nada", () => {
-    nav.search = "guardado=otro";
-    render(<SavedNotice />);
-    expect(screen.getByRole("status")).toBeEmptyDOMElement();
-  });
-
   it("cerrar quita guardado y conserva el filtro de categoría", () => {
     nav.search = "categoria=cabello&guardado=1";
     render(<SavedNotice />);

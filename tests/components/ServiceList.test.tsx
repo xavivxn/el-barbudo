@@ -7,9 +7,6 @@ import type { ServiceDTO } from "@/lib/types";
 const actions = vi.hoisted(() => ({ saveService: vi.fn(), deleteService: vi.fn(), moveService: vi.fn() }));
 vi.mock("@/app/admin/service-actions", () => actions);
 
-const router = vi.hoisted(() => ({ replace: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => router }));
-
 // jsdom no implementa showModal/close: lo mínimo para que `open` y el evento `close` existan, y como
 // el navegador, showModal() lleva el foco al primer control del diálogo.
 beforeEach(() => {
@@ -119,6 +116,79 @@ describe("orden", () => {
   });
 });
 
+describe("región de estado", () => {
+  async function saveFirstPrice(user: ReturnType<typeof userEvent.setup>, value: string) {
+    await user.click(screen.getByRole("button", { name: "Editar Corte clásico" }));
+    const price = screen.getByLabelText("Precio");
+    await user.clear(price);
+    await user.type(price, value);
+    await user.click(screen.getByRole("button", { name: "Guardar servicio" }));
+    await waitFor(() => expect(screen.queryByLabelText("Nombre")).not.toBeInTheDocument());
+  }
+
+  it("dos guardados seguidos anuncian los dos, con la región vacía entre uno y otro", async () => {
+    actions.saveService.mockResolvedValue({ saved: true });
+    const user = userEvent.setup();
+    render(<ServiceList services={services} />);
+    const status = screen.getByRole("status");
+    const seen: string[] = [];
+    new MutationObserver(() => seen.push(status.textContent ?? "")).observe(status, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    await saveFirstPrice(user, "90000");
+    await waitFor(() => expect(status).toHaveTextContent("Servicio guardado"));
+    await saveFirstPrice(user, "95000");
+    await waitFor(() => expect(status).toHaveTextContent("Servicio guardado"));
+
+    // Servicio guardado, (vacío), Servicio guardado: el segundo no se pierde por ser idéntico.
+    expect(seen.filter((text) => text === "Servicio guardado")).toHaveLength(2);
+    expect(seen).toContain("");
+    expect(seen.indexOf("")).toBeGreaterThan(seen.indexOf("Servicio guardado"));
+  });
+
+  it("mover después de guardar reemplaza el texto", async () => {
+    actions.saveService.mockResolvedValue({ saved: true });
+    const user = userEvent.setup();
+    render(<ServiceList services={services} />);
+    await saveFirstPrice(user, "90000");
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Servicio guardado"));
+
+    await user.click(screen.getByRole("button", { name: "Bajar Corte clásico" }));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Corte clásico quedó en la posición 2 de 3."),
+    );
+    expect(screen.getByRole("status")).not.toHaveTextContent("Servicio guardado");
+  });
+
+  it("borrar escribe Servicio eliminado", async () => {
+    const user = userEvent.setup();
+    render(<ServiceList services={services} />);
+    await user.click(screen.getByRole("button", { name: "Eliminar Afeitado" }));
+    await user.click(within(dialog()).getByRole("button", { name: "Eliminar" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Servicio eliminado"));
+  });
+
+  it("un guardado fallido borra el aviso anterior", async () => {
+    actions.saveService
+      .mockResolvedValueOnce({ saved: true })
+      .mockResolvedValueOnce({ errors: { price: "Ingresá un precio en guaraníes, sin decimales." } });
+    const user = userEvent.setup();
+    render(<ServiceList services={services} />);
+    await saveFirstPrice(user, "90000");
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Servicio guardado"));
+
+    await user.click(screen.getByRole("button", { name: "Editar Corte clásico" }));
+    await user.click(screen.getByRole("button", { name: "Guardar servicio" }));
+    await screen.findByRole("alert");
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+});
+
 describe("edición en línea", () => {
   it("Editar expande el formulario con los datos y marca aria-expanded", async () => {
     const user = userEvent.setup();
@@ -160,7 +230,7 @@ describe("edición en línea", () => {
     const sent = actions.saveService.mock.calls[0][1] as FormData;
     expect(sent.get("id")).toBe("s2");
     expect(sent.get("price")).toBe("130000");
-    expect(router.replace).toHaveBeenCalledWith("/admin/servicios?guardado=servicio", { scroll: false });
+    expect(await screen.findByText("Servicio guardado")).toBeInTheDocument();
     expect(trigger).toHaveFocus();
   });
 
@@ -188,6 +258,6 @@ describe("edición en línea", () => {
     await user.click(screen.getByRole("button", { name: "Nuevo servicio" }));
     expect(screen.getByLabelText("Nombre")).toHaveValue("");
     expect(document.querySelector('input[name="id"]')).toBeNull();
-    expect(document.querySelector('input[name="order"]')).toHaveValue("3");
+    expect(document.querySelector('input[name="order"]')).toBeNull();
   });
 });

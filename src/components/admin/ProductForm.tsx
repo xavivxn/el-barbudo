@@ -1,12 +1,10 @@
 "use client";
 
-import { CircleAlert, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import {
   type ChangeEvent,
   type FocusEvent,
   type FormEvent,
-  type MouseEvent,
-  type ReactNode,
   useActionState,
   useDeferredValue,
   useEffect,
@@ -15,6 +13,7 @@ import {
   useTransition,
 } from "react";
 import { type FormState, saveProduct } from "@/app/admin/actions";
+import { ErrorSummary, Field, FieldError, focusRing, inputClass, useFieldErrors } from "@/components/admin/form-parts";
 import { Button } from "@/components/ui/Button";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { isHttpsUrl, parsePrice } from "@/lib/admin-messages";
@@ -23,8 +22,6 @@ import { CATEGORIES, type Category, type ProductDTO } from "@/lib/types";
 import { fieldErrors, parseProductForm, productSchema, slugify } from "@/lib/validation";
 
 const initialState: FormState = {};
-
-const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 type Row = {
   uid: number;
@@ -93,70 +90,6 @@ function targetIdOf(key: string): string {
   return idOf(key);
 }
 
-const inputClass = (error?: string) =>
-  `min-h-12 w-full rounded-lg border bg-surface px-4 text-base text-fg ${focusRing} ${
-    error ? "border-danger" : "border-line"
-  }`;
-
-type ControlProps = {
-  id: string;
-  "aria-invalid": true | undefined;
-  "aria-describedby": string | undefined;
-  className: string;
-};
-
-function Field({
-  id,
-  label,
-  optional,
-  hint,
-  error,
-  className = "",
-  children,
-}: {
-  id: string;
-  label: string;
-  optional?: boolean;
-  hint?: ReactNode;
-  error?: string;
-  className?: string;
-  children: (props: ControlProps) => ReactNode;
-}) {
-  const hintId = `${id}-hint`;
-  const errorId = `${id}-error`;
-  const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ");
-  return (
-    <div className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
-      <label htmlFor={id} className="font-medium">
-        {label}
-        {optional ? <span className="font-normal text-muted"> (opcional)</span> : null}
-      </label>
-      {hint ? (
-        <p id={hintId} className="text-sm text-muted">
-          {hint}
-        </p>
-      ) : null}
-      {children({
-        id,
-        "aria-invalid": error ? true : undefined,
-        "aria-describedby": describedBy || undefined,
-        className: inputClass(error),
-      })}
-      <FieldError id={errorId} error={error} />
-    </div>
-  );
-}
-
-function FieldError({ id, error }: { id: string; error?: string }) {
-  if (!error) return null;
-  return (
-    <p id={id} className="flex items-start gap-1.5 text-sm font-medium text-danger">
-      <CircleAlert size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
-      {error}
-    </p>
-  );
-}
-
 const legendClass = "mb-4 text-lg font-semibold";
 const sectionClass = "min-w-0 border-0 p-0";
 
@@ -201,18 +134,11 @@ export function ProductForm({ product }: { product?: ProductDTO }) {
       : [makeRow()],
   );
 
-  // Las respuestas del servidor reemplazan los errores; después cada campo se valida por su cuenta.
-  const [seenState, setSeenState] = useState(state);
-  const [errors, setErrors] = useState<Record<string, string>>(state.errors ?? {});
-  if (state !== seenState) {
-    setSeenState(state);
-    setErrors(state.errors ?? {});
-  }
-
-  const summaryRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (state.errors || state.message) summaryRef.current?.focus();
-  }, [state]);
+  const { errors, setErrors, summaryRef, validate, summaryKeys } = useFieldErrors(
+    state,
+    (form) => fieldErrors(productSchema.safeParse(parseProductForm(form))),
+    (name) => (KNOWN_FIELD.test(name) ? errorKeyOf(name) : null),
+  );
 
   const pendingFocus = useRef<string | null>(null);
   useEffect(() => {
@@ -235,27 +161,6 @@ export function ProductForm({ product }: { product?: ProductDTO }) {
       .filter(isHttpsUrl)
       .slice(0, 12),
   );
-
-  /** Valida un solo campo con el mismo esquema del servidor, leyendo lo que hay en el formulario. */
-  function validate(target: EventTarget, onlyIfInvalid: boolean) {
-    if (
-      !(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)
-    ) {
-      return;
-    }
-    const name = target.name;
-    if (!target.form || !KNOWN_FIELD.test(name)) return;
-    const key = errorKeyOf(name);
-    if (onlyIfInvalid && !errors[key]) return;
-    const found = fieldErrors(productSchema.safeParse(parseProductForm(new FormData(target.form))))[key];
-    setErrors((current) => {
-      if (current[key] === found) return current;
-      const next = { ...current };
-      if (found) next[key] = found;
-      else delete next[key];
-      return next;
-    });
-  }
 
   function onBlur(event: FocusEvent<HTMLFormElement>) {
     validate(event.target, false);
@@ -311,20 +216,12 @@ export function ProductForm({ product }: { product?: ProductDTO }) {
     setErrors((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith("variants."))));
   }
 
-  // El resumen es de los errores del último envío que siguen sin corregir; los de blur solo van junto al campo.
-  const errorKeys = Object.keys(state.errors ?? {})
-    .filter((key) => key in errors)
+  const summaryItems = [...summaryKeys]
     .sort((a, b) => {
-    const [x, y] = [errorOrder(a), errorOrder(b)];
-    return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
-  });
-  const summaryVisible = errorKeys.length > 0 || Boolean(state.message);
-
-  function jumpTo(event: MouseEvent<HTMLAnchorElement>, key: string) {
-    event.preventDefault();
-    // focus() ya lleva el campo a la vista.
-    document.getElementById(targetIdOf(key))?.focus();
-  }
+      const [x, y] = [errorOrder(a), errorOrder(b)];
+      return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+    })
+    .map((key) => ({ key, targetId: targetIdOf(key), label: labelOfKey(key), error: errors[key] }));
 
   const notesDescribedBy = errors.notes ? "notes-error" : undefined;
 
@@ -341,39 +238,7 @@ export function ProductForm({ product }: { product?: ProductDTO }) {
         </>
       ) : null}
 
-      {summaryVisible ? (
-        <div
-          ref={summaryRef}
-          role="alert"
-          tabIndex={-1}
-          className={`border-2 border-danger bg-surface p-4 ${focusRing}`}
-        >
-          <p className="flex items-center gap-2 font-semibold text-danger">
-            <CircleAlert size={20} aria-hidden="true" className="shrink-0" />
-            {errorKeys.length > 0
-              ? errorKeys.length === 1
-                ? "Hay 1 campo para revisar"
-                : `Hay ${errorKeys.length} campos para revisar`
-              : state.message}
-          </p>
-          {errorKeys.length > 0 ? (
-            <ul className="mt-2 list-disc pl-6">
-              {errorKeys.map((key) => (
-                <li key={key}>
-                  <a
-                    href={`#${targetIdOf(key)}`}
-                    onClick={(event) => jumpTo(event, key)}
-                    className={`underline underline-offset-4 ${focusRing}`}
-                  >
-                    {labelOfKey(key)}: {errors[key]}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {errorKeys.length > 0 && state.message ? <p className="mt-2">{state.message}</p> : null}
-        </div>
-      ) : null}
+      <ErrorSummary summaryRef={summaryRef} items={summaryItems} message={state.message} />
 
       <fieldset className={`${sectionClass} flex flex-col gap-5`}>
         <legend className={legendClass}>Datos básicos</legend>

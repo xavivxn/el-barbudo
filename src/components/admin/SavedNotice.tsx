@@ -4,15 +4,8 @@ import { X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
-/** Valor de `?guardado=` -> texto del aviso. `1` es el de productos. */
-const MESSAGES: Record<string, string> = {
-  "1": "Producto guardado",
-  servicio: "Servicio guardado",
-};
-
 /**
- * Aviso "Producto guardado" tras `redirect("/admin?guardado=1")`, o "Servicio guardado" con
- * `?guardado=servicio`.
+ * Aviso "Producto guardado" tras `redirect("/admin?guardado=1")`.
  *
  * Vive en el layout del panel para que la región `role="status"` ya exista cuando se navega desde
  * el formulario: un `status` que aparece junto con su texto no se anuncia. Cerrarlo es un enlace
@@ -21,8 +14,7 @@ const MESSAGES: Record<string, string> = {
 export function SavedNotice() {
   const pathname = usePathname();
   const params = useSearchParams();
-  const flag = params.get("guardado");
-  const message = flag !== null && Object.hasOwn(MESSAGES, flag) ? MESSAGES[flag] : null;
+  const saved = params.get("guardado") === "1";
 
   const rest = new URLSearchParams(params.toString());
   rest.delete("guardado");
@@ -30,11 +22,10 @@ export function SavedNotice() {
   const closeHref = query ? `${pathname}?${query}` : pathname;
 
   return (
-    // Pegajoso: con una lista larga el aviso sigue a la vista aunque el cambio se hizo más abajo.
-    <div role="status" className="sticky top-2 z-10">
-      {message ? (
+    <div role="status">
+      {saved ? (
         <div className="mb-6 flex items-center justify-between gap-3 border border-ok bg-surface py-1 pl-4 pr-1 text-ok">
-          <p className="font-medium">{message}</p>
+          <p className="font-medium">Producto guardado</p>
           <Link
             href={closeHref}
             replace

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { deleteService, moveService } from "@/app/admin/service-actions";
 import { ServiceForm } from "@/components/admin/ServiceForm";
@@ -9,19 +8,30 @@ import { formatPYG } from "@/lib/money";
 import type { ServiceDTO } from "@/lib/types";
 
 const NEW = "new";
-const SAVED_URL = "/admin/servicios?guardado=servicio";
+const ANNOUNCE_DELAY_MS = 50;
 
 const disabledLook =
   "aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-fg";
 
 /** Lista del admin de servicios: orden, edición en línea y borrado con confirmación. */
 export function ServiceList({ services }: { services: ServiceDTO[] }) {
-  const router = useRouter();
   const [, startTransition] = useTransition();
   /** Id del servicio que se edita, `NEW` para el formulario vacío, `null` si no hay ninguno abierto. */
   const [editing, setEditing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<ServiceDTO | null>(null);
   const [announcement, setAnnouncement] = useState("");
+
+  /**
+   * Escribe en la región de estado. Primero la vacía y recién después pone el texto: así un mensaje
+   * idéntico al anterior ("Servicio guardado" dos veces) se vuelve a anunciar.
+   */
+  const announceTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  function announce(text: string) {
+    clearTimeout(announceTimer.current);
+    setAnnouncement("");
+    if (text) announceTimer.current = setTimeout(() => setAnnouncement(text), ANNOUNCE_DELAY_MS);
+  }
+  useEffect(() => () => clearTimeout(announceTimer.current), []);
 
   const headingRef = useRef<HTMLHeadingElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -74,7 +84,7 @@ export function ServiceList({ services }: { services: ServiceDTO[] }) {
     focusAfterMove.current = `service-${direction}-${service.id}`;
     startTransition(async () => {
       await moveService(service.id, direction);
-      setAnnouncement(`${service.name} quedó en la posición ${target + 1} de ${services.length}.`);
+      announce(`${service.name} quedó en la posición ${target + 1} de ${services.length}.`);
     });
   }
 
@@ -91,6 +101,7 @@ export function ServiceList({ services }: { services: ServiceDTO[] }) {
     dialogRef.current?.close();
     startTransition(async () => {
       await deleteService(id);
+      announce("Servicio eliminado");
     });
   }
 
@@ -109,12 +120,12 @@ export function ServiceList({ services }: { services: ServiceDTO[] }) {
     <div id={`service-form-${id}`} className="border-t border-line pt-5">
       <ServiceForm
         service={service}
-        nextOrder={services.length}
         formId={`service-form-${id}`}
         onSaved={() => {
           closeForm(id);
-          router.replace(SAVED_URL, { scroll: false });
+          announce("Servicio guardado");
         }}
+        onFailed={() => announce("")}
         onCancel={() => closeForm(id)}
       />
     </div>
@@ -136,8 +147,11 @@ export function ServiceList({ services }: { services: ServiceDTO[] }) {
         </Button>
       </div>
 
-      <div role="status" className="sr-only">
-        {announcement}
+      {/* Siempre montada: un texto que aparece en una región ya existente se anuncia de forma fiable. */}
+      <div role="status">
+        {announcement ? (
+          <p className="mt-6 border border-ok bg-surface px-4 py-3 font-medium text-ok">{announcement}</p>
+        ) : null}
       </div>
 
       {editing === NEW ? <div className="mt-6 border border-line bg-surface p-4">{form(undefined, NEW)}</div> : null}
