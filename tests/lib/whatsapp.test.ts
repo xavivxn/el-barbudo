@@ -5,6 +5,7 @@ import {
   buildOrderMessage,
   whatsappUrl,
 } from "@/lib/whatsapp";
+import { site } from "@/site";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -48,7 +49,7 @@ describe("whatsappUrl", () => {
   it("conserva caracteres especiales intactos", () => {
     const tricky = "Café & Co #1?\nsí 👋";
     const url = whatsappUrl(tricky, "595981123456");
-    expect(decodeURIComponent(new URL(url).search.slice(6))).toBe(tricky);
+    expect(new URL(url).searchParams.get("text")).toBe(tricky);
   });
 
   it("usa la variable de entorno si no se pasa número", () => {
@@ -58,6 +59,14 @@ describe("whatsappUrl", () => {
 
   it("usa site.whatsapp si no hay número ni variable", () => {
     vi.stubEnv("NEXT_PUBLIC_WHATSAPP_NUMBER", "");
-    expect(whatsappUrl("a")).toBe("https://wa.me/595981123456?text=a");
+    expect(whatsappUrl("a")).toBe(`https://wa.me/${site.whatsapp.replace(/\D/g, "")}?text=a`);
+  });
+
+  it("usa site.whatsapp si la variable no tiene dígitos", () => {
+    const expected = `https://wa.me/${site.whatsapp.replace(/\D/g, "")}?text=a`;
+    vi.stubEnv("NEXT_PUBLIC_WHATSAPP_NUMBER", "  ");
+    expect(whatsappUrl("a")).toBe(expected);
+    vi.stubEnv("NEXT_PUBLIC_WHATSAPP_NUMBER", "TBD");
+    expect(whatsappUrl("a")).toBe(expected);
   });
 });

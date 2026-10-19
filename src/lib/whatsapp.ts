@@ -26,7 +26,7 @@ export function buildBookingMessage(serviceName: string): string {
 }
 
 export function whatsappUrl(text: string, phone?: string): string {
-  const raw = phone ?? process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
-  const number = (raw || site.whatsapp).replace(/\D/g, "");
+  const digits = (phone ?? process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "").replace(/\D/g, "");
+  const number = digits || site.whatsapp.replace(/\D/g, "");
   return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
 }
