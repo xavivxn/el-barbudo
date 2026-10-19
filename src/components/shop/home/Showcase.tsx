@@ -25,6 +25,9 @@ import type { ProductDTO } from "@/lib/types";
 const INTERVAL_MS = 6000;
 /** Espera tras el último evento de scroll para leer en qué diapositiva quedó el swipe. */
 const SCROLL_SETTLE_MS = 120;
+/** Salto de más de una diapositiva: fundido corto (bajo 400 ms) y desplazamiento instantáneo en el punto más bajo. */
+const JUMP_DIP_MS = 360;
+const JUMP_DIP_LOW = 0.4;
 const PARALLAX_PX = 24;
 /** Alto del área de la foto; el brillo del tono usa el mismo para quedar justo detrás. */
 const IMAGE_AREA_HEIGHT = "h-[38svh] min-h-60 md:h-[520px]";
@@ -37,6 +40,13 @@ const controlButton = `h-11 w-11 shrink-0 cursor-pointer items-center justify-ce
 // En móvil los dos CTA comparten una fila de ~150 px cada uno: menos padding que el `md` del Button
 // (con `!`, porque la clase de tamaño del Button gana por orden en el CSS).
 const ctaFit = "gap-1.5! px-3! whitespace-nowrap md:gap-2! md:px-5! lg:px-7!";
+
+type Progress = "running" | "full" | "empty";
+const PROGRESS_CLASS: Record<Progress, string> = {
+  running: "animate-showcase-progress",
+  full: "scale-x-100",
+  empty: "scale-x-0",
+};
 
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 
@@ -85,9 +95,13 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
   const sectionRef = useRef<HTMLElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const rotationRef = useRef<HTMLButtonElement>(null);
   const settleTimer = useRef<number | undefined>(undefined);
+  const jumpTimer = useRef<number | undefined>(undefined);
 
-  const [active, setActive] = useState(0);
+  const [activeState, setActive] = useState(0);
+  // Si la lista se achica, la activa queda dentro del rango.
+  const active = Math.min(activeState, count - 1);
   const [paused, setPaused] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [focusedWithin, setFocusedWithin] = useState(false);
@@ -102,10 +116,39 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
   const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start end", "end start"] });
   const parallaxY = useTransform(scrollYProgress, [0, 1], [PARALLAX_PX, -PARALLAX_PX]);
 
+  function scrollTrack(next: number) {
+    const track = trackRef.current;
+    if (!track) return;
+    window.clearTimeout(jumpTimer.current);
+    const left = next * track.clientWidth;
+    // Un salto (incluida la vuelta de la última a la primera) no recorre todas las diapositivas:
+    // corta con un fundido breve del riel. Entre vecinas, desplazamiento suave.
+    const jump = Math.abs(next - active) > 1;
+    if (reducedMotion || !jump) {
+      track.scrollTo({ left, behavior: reducedMotion ? "auto" : "smooth" });
+      return;
+    }
+    if (typeof track.animate !== "function") {
+      track.scrollTo({ left, behavior: "auto" });
+      return;
+    }
+    track.animate(
+      [
+        { opacity: 1, easing: "ease-in" },
+        { opacity: 0, offset: JUMP_DIP_LOW, easing: "ease-out" },
+        { opacity: 1 },
+      ],
+      { duration: JUMP_DIP_MS },
+    );
+    jumpTimer.current = window.setTimeout(
+      () => track.scrollTo({ left, behavior: "auto" }),
+      JUMP_DIP_MS * JUMP_DIP_LOW,
+    );
+  }
+
   function goTo(target: number, { moveFocus = false } = {}) {
     const next = wrapIndex(target, count);
-    const track = trackRef.current;
-    track?.scrollTo({ left: next * track.clientWidth, behavior: reducedMotion ? "auto" : "smooth" });
+    scrollTrack(next);
     if (!moveFocus) {
       setActive(next);
       return;
@@ -115,7 +158,11 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
     slideRefs.current[next]?.focus({ preventScroll: true });
   }
 
-  const advance = useEffectEvent(() => goTo(active + 1));
+  const advance = useEffectEvent(() => {
+    // Defensa: nunca volver inert la diapositiva que tiene el foco.
+    if (slideRefs.current[active]?.contains(document.activeElement)) return;
+    goTo(active + 1);
+  });
 
   useEffect(() => {
     if (!playing) return;
@@ -124,7 +171,13 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
     // `active` reinicia el intervalo: tras un swipe o un clic, la diapositiva nueva dura 6 s enteros.
   }, [playing, active]);
 
-  useEffect(() => () => window.clearTimeout(settleTimer.current), []);
+  useEffect(
+    () => () => {
+      window.clearTimeout(settleTimer.current);
+      window.clearTimeout(jumpTimer.current);
+    },
+    [],
+  );
 
   function onTrackScroll() {
     window.clearTimeout(settleTimer.current);
@@ -145,8 +198,10 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
   }
 
   function onFocus(event: FocusEvent<HTMLElement>) {
-    // Solo cuando el foco entra desde afuera: moverse adentro no vuelve a pausar tras "Reanudar".
-    if (!event.currentTarget.contains(event.relatedTarget)) setFocusedWithin(true);
+    // Pausa todo foco que entra desde afuera y todo foco en una diapositiva u otro control. Solo
+    // moverse adentro hasta el botón de rotación no pausa: tras "Reanudar" el foco queda ahí.
+    const fromOutside = !event.currentTarget.contains(event.relatedTarget);
+    if (fromOutside || event.target !== rotationRef.current) setFocusedWithin(true);
   }
 
   function onBlur(event: FocusEvent<HTMLElement>) {
@@ -198,6 +253,22 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
         })}
       </div>
 
+      {/*
+        Control de rotación: primero en el orden de foco y de lectura (patrón WAI-ARIA). Va arriba a
+        la derecha, sobre el área de la foto (nunca sobre el texto), en móvil y en desktop.
+      */}
+      {count > 1 && !reducedMotion ? (
+        <button
+          ref={rotationRef}
+          type="button"
+          aria-label={paused ? "Reanudar" : "Pausar"}
+          onClick={togglePaused}
+          className={`${controlButton} absolute top-2 right-2 z-10 inline-flex bg-surface md:top-5 md:right-5`}
+        >
+          {paused ? <Play size={18} aria-hidden="true" /> : <Pause size={18} aria-hidden="true" />}
+        </button>
+      ) : null}
+
       <div
         ref={trackRef}
         onScroll={onTrackScroll}
@@ -225,6 +296,7 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
           <div className="flex flex-1 items-center gap-2">
             {products.map((product, index) => {
               const current = index === active;
+              const progress: Progress = current ? (playing ? "running" : "full") : "empty";
               return (
                 <button
                   key={product.id}
@@ -237,10 +309,9 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
                   <span className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 overflow-hidden rounded-full bg-fg/15 transition-colors duration-200 group-hover/bar:bg-fg/35">
                     <span
                       // Una animación nueva por cada vuelta: al cambiar de diapositiva o al reanudar arranca de cero.
-                      key={current && playing ? `run-${active}` : "idle"}
-                      className={`block h-full origin-left bg-fg ${
-                        current ? (playing ? "animate-showcase-progress" : "scale-x-100") : "scale-x-0"
-                      }`}
+                      key={progress === "running" ? `run-${active}` : progress}
+                      data-progress={progress}
+                      className={`block h-full origin-left bg-fg ${PROGRESS_CLASS[progress]}`}
                     />
                   </span>
                 </button>
@@ -248,16 +319,6 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
             })}
           </div>
 
-          {reducedMotion ? null : (
-            <button
-              type="button"
-              aria-label={paused ? "Reanudar" : "Pausar"}
-              onClick={togglePaused}
-              className={`${controlButton} inline-flex`}
-            >
-              {paused ? <Play size={18} aria-hidden="true" /> : <Pause size={18} aria-hidden="true" />}
-            </button>
-          )}
           <button
             type="button"
             aria-label="Anterior"

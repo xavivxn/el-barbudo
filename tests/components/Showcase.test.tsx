@@ -195,6 +195,64 @@ describe("Showcase", () => {
     expect(screen.getByRole("button", { name: "Ir al destacado 3" })).toHaveAttribute("aria-current", "true");
   });
 
+  it("muestra el eyebrow 'Destacado · N/M' en cada diapositiva", () => {
+    render(<Showcase products={[p1, p2, p3, soldOutNoPhoto]} />);
+    const slide = screen.getByRole("group", { name: "1 de 4" });
+    expect(
+      within(slide).getByText((_, element) => element?.tagName === "P" && element.textContent === "Destacado · 1/4"),
+    ).toBeInTheDocument();
+  });
+
+  it("el botón de rotación es lo primero de la región, antes de las diapositivas", () => {
+    render(<Showcase products={[p1, p2, p3]} />);
+    const region = screen.getByRole("region", { name: /destacados/i });
+
+    const rotation = screen.getByRole("button", { name: "Pausar" });
+    const focusables = region.querySelectorAll("button, a[href]");
+    expect(focusables[0]).toBe(rotation);
+    expect(
+      rotation.compareDocumentPosition(screen.getByRole("group", { name: "1 de 3" })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("los saltos de más de una diapositiva (y la vuelta circular) no desplazan con animación", async () => {
+    const user = userEvent.setup();
+    render(<Showcase products={[p1, p2, p3]} />);
+
+    await user.click(screen.getByRole("button", { name: "Ir al destacado 3" }));
+    expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: "auto" }));
+    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    expect(screen.getByRole("button", { name: "Ir al destacado 1" })).toHaveAttribute("aria-current", "true");
+    expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: "auto" }));
+    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+    expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: "smooth" }));
+  });
+
+  it("con foco en un enlace de la diapositiva, las flechas pasan el foco a la diapositiva nueva", async () => {
+    const user = userEvent.setup();
+    render(<Showcase products={[p1, p2, p3]} />);
+
+    act(() =>
+      within(screen.getByRole("group", { name: "1 de 3" }))
+        .getByRole("link", { name: "Ver producto" })
+        .focus(),
+    );
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("group", { name: "2 de 3" })).toHaveFocus();
+    expect(screen.getByRole("group", { name: "2 de 3" })).not.toHaveAttribute("inert");
+  });
+
+  it("si la lista se achica, la diapositiva activa queda dentro del rango", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Showcase products={[p1, p2, p3, soldOutNoPhoto]} />);
+    await user.click(screen.getByRole("button", { name: "Ir al destacado 4" }));
+
+    rerender(<Showcase products={[p1, p2]} />);
+    expect(activeSlide()).toHaveAccessibleName("2 de 2");
+    expect(screen.getByRole("button", { name: "Ir al destacado 2" })).toHaveAttribute("aria-current", "true");
+  });
+
   describe("auto-avance", () => {
     it("avanza cada 6 s, se pausa con hover y con el botón Pausar/Reanudar", async () => {
       useFakeTimersWithUserEvent();
@@ -225,6 +283,41 @@ describe("Showcase", () => {
       expect(activeSlide()).toHaveAccessibleName("3 de 3");
       act(() => vi.advanceTimersByTime(6000));
       expect(activeSlide()).toHaveAccessibleName("1 de 3");
+    });
+
+    it("tras Reanudar, el foco en un enlace de la diapositiva vuelve a pausar y no se pierde", async () => {
+      useFakeTimersWithUserEvent();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<Showcase products={[p1, p2, p3]} />);
+
+      await user.click(screen.getByRole("button", { name: "Pausar" }));
+      await user.click(screen.getByRole("button", { name: "Reanudar" }));
+      await user.unhover(screen.getByRole("region", { name: /destacados/i }));
+      const link = within(screen.getByRole("group", { name: "1 de 3" })).getByRole("link", {
+        name: "Ver producto",
+      });
+      act(() => link.focus());
+      act(() => vi.advanceTimersByTime(12000));
+
+      expect(activeSlide()).toHaveAccessibleName("1 de 3");
+      expect(link).toHaveFocus();
+    });
+
+    it("anuncia los cambios solo sin rotación y la barra activa queda llena en pausa", async () => {
+      useFakeTimersWithUserEvent();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<Showcase products={[p1, p2, p3]} />);
+      const track = screen.getByRole("group", { name: "1 de 3" }).parentElement as HTMLElement;
+      const fill = (n: number) =>
+        screen.getByRole("button", { name: `Ir al destacado ${n}` }).querySelector("[data-progress]");
+
+      expect(track).toHaveAttribute("aria-live", "off");
+      expect(fill(1)).toHaveAttribute("data-progress", "running");
+      expect(fill(2)).toHaveAttribute("data-progress", "empty");
+
+      await user.click(screen.getByRole("button", { name: "Pausar" }));
+      expect(track).toHaveAttribute("aria-live", "polite");
+      expect(fill(1)).toHaveAttribute("data-progress", "full");
     });
 
     it("se pausa con el foco dentro de la región", () => {
