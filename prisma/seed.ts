@@ -1,12 +1,9 @@
+// ATENCION: este seed BORRA todos los productos, variantes y servicios antes de
+// recrearlos. Solo para desarrollo o demo; nunca correrlo contra datos reales.
 import "dotenv/config";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { PrismaClient } from "../src/generated/prisma/client";
+import { createPrismaClient } from "../src/lib/prisma-client";
 
-const prisma = new PrismaClient({
-  adapter: new PrismaBetterSqlite3({
-    url: process.env.DATABASE_URL ?? "file:./dev.db",
-  }),
-});
+const prisma = createPrismaClient();
 
 const img = (id: string) => `https://images.unsplash.com/photo-${id}?w=1200&q=75`;
 
@@ -58,7 +55,7 @@ const products: SeedProduct[] = [
       base: "Ambroxan, cedro, ládano",
     },
     tags: ["fresco", "especiado", "día", "intenso"],
-    images: [img("1598634222670-87c5f558119c")],
+    images: [img("1698877779289-d546e6376001")],
     featured: true,
     variants: [
       { label: "60 ml", price: 680000, stock: 4 },
@@ -78,7 +75,7 @@ const products: SeedProduct[] = [
       base: "Almizcle, musgo de roble, ámbar gris, vainilla",
     },
     tags: ["intenso", "noche", "amaderado"],
-    images: [img("1615634260167-c8cdede054de")],
+    images: [img("1672848812581-f6e71ffa6839")],
     featured: true,
     variants: [
       { label: "50 ml", price: 1450000, stock: 2 },
@@ -98,7 +95,7 @@ const products: SeedProduct[] = [
       base: "Haba tonka, ámbar, vainilla",
     },
     tags: ["amaderado", "noche", "intenso"],
-    images: [img("1611146264101-358a3b387eee")],
+    images: [img("1553699357-fdefb876c402")],
     variants: [{ label: "50 ml", price: 1650000, stock: 0 }],
   },
   {
@@ -168,10 +165,7 @@ const products: SeedProduct[] = [
       "Vitamina E: protege y da brillo",
     ],
     tags: ["natural", "suave", "día"],
-    images: [
-      img("1673350963924-cb4267d9b6eb"),
-      img("1627875777089-d32f1127e9ff"),
-    ],
+    images: [img("1608571424266-edeb9bbefdec")],
     featured: true,
     variants: [{ label: "30 ml", price: 85000, stock: 12 }],
   },
@@ -188,10 +182,7 @@ const products: SeedProduct[] = [
       "Aceite de almendras: suaviza el vello",
     ],
     tags: ["natural", "amaderado"],
-    images: [
-      img("1775126454589-53b494ca57ac"),
-      img("1775126455263-ed926ab25fa4"),
-    ],
+    images: [], // sin foto: no hay una sin marca ajena; el sitio muestra el placeholder
     variants: [{ label: "100 ml", price: 95000, stock: 8 }],
   },
   {
@@ -223,10 +214,7 @@ const products: SeedProduct[] = [
       "Se enjuaga con agua",
     ],
     tags: ["natural", "día"],
-    images: [
-      img("1775127741095-86ee33b6b385"),
-      img("1775127741393-2b571811bb01"),
-    ],
+    images: [], // sin foto: no hay una sin marca ajena; el sitio muestra el placeholder
     variants: [{ label: "100 g", price: 90000, stock: 10 }],
   },
   {
@@ -242,10 +230,7 @@ const products: SeedProduct[] = [
       "Aroma a vainilla y ámbar",
     ],
     tags: ["intenso", "dulce"],
-    images: [
-      img("1614587113639-67c78332bb39"),
-      img("1775126251039-214af64257ff"),
-    ],
+    images: [], // sin foto: no hay una sin marca ajena; el sitio muestra el placeholder
     variants: [{ label: "80 g", price: 75000, stock: 9 }],
   },
 ];
