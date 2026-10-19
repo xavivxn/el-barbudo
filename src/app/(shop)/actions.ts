@@ -10,7 +10,7 @@ import type { VariantSnapshot } from "@/lib/types";
 const MAX_IDS = 500;
 
 /**
- * Precio, stock y disponibilidad actuales de las variantes del carrito.
+ * Precio, stock, disponibilidad, nombre, dirección, foto y tamaño actuales de las variantes del carrito.
  * Solo lectura y sin auth: la usa el drawer para reconciliar un carrito guardado días atrás.
  * Las variantes que ya no existen no vuelven en la respuesta.
  */

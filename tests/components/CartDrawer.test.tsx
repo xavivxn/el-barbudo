@@ -70,8 +70,16 @@ const noirQty3 = item({
 });
 const borrado = item({ variantId: "gone", name: "Producto borrado", unitPrice: 50000 });
 
+/** Lo que la base tiene hoy de cada variante de estas pruebas (sin cambios respecto del carrito). */
+const CURRENT: Record<string, Pick<VariantSnapshot, "name" | "slug" | "image" | "variantLabel">> = {
+  "noir-100": { name: "Noir Intense", slug: "noir-intense", image: null, variantLabel: "100 ml" },
+  "noir-50": { name: "Noir Intense", slug: "noir-intense", image: null, variantLabel: "50 ml" },
+  gone: { name: "Producto borrado", slug: "producto", image: null, variantLabel: null },
+  v1: { name: "Cera", slug: "producto", image: null, variantLabel: null },
+};
+
 function snap(id: string, overrides: Partial<VariantSnapshot> = {}): VariantSnapshot {
-  return { id, price: 100000, stock: 5, available: true, ...overrides };
+  return { id, price: 100000, stock: 5, available: true, ...CURRENT[id], ...overrides };
 }
 
 describe("CartDrawer", () => {
@@ -156,6 +164,19 @@ describe("CartDrawer", () => {
       expect(screen.getByRole("status")).toHaveTextContent("Ya no está disponible: Cera."),
     );
     expect(screen.getByRole("heading", { name: "Tu carrito está vacío" })).toBeInTheDocument();
+  });
+
+  it("un producto renombrado se actualiza en la lista y en el mensaje, sin aviso", async () => {
+    refresh.mockResolvedValue([snap("v1", { name: "Cera mate", slug: "cera-mate", price: 100000 })]);
+    useCart.setState({ items: [item({ name: "Cera" })], isOpen: true });
+
+    render(<CartDrawer />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Quitar Cera mate" })).toBeInTheDocument());
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    expect(
+      screen.getByRole("link", { name: /enviar pedido por whatsapp/i }).getAttribute("href"),
+    ).toContain(encodeURIComponent("1 × Cera mate"));
   });
 
   it("si el refresco falla conserva el carrito y no muestra avisos", async () => {

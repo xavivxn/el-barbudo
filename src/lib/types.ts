@@ -39,10 +39,18 @@ export type ServiceDTO = {
   order: number;
 };
 
-/** `available` = la variante existe y su producto está activo. */
+/**
+ * Estado actual de una variante para refrescar el carrito. `available` = la variante existe y su
+ * producto está activo. `name`, `slug`, `image` y `variantLabel` se copian tal cual al ítem
+ * (`variantLabel` es `null` si el producto tiene una sola variante, como al agregarlo).
+ */
 export type VariantSnapshot = {
   id: string;
   price: number;
   stock: number;
   available: boolean;
+  name: string;
+  slug: string;
+  image: string | null;
+  variantLabel: string | null;
 };

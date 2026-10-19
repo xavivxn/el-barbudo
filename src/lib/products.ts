@@ -157,12 +157,21 @@ export async function getVariantSnapshots(
   if (ids.length === 0) return [];
   const rows = await prisma.variant.findMany({
     where: { id: { in: ids } },
-    include: { product: { select: { active: true } } },
+    include: {
+      product: {
+        select: { active: true, name: true, slug: true, images: true, _count: { select: { variants: true } } },
+      },
+    },
   });
   return rows.map((v) => ({
     id: v.id,
     price: v.price,
     stock: v.stock,
     available: v.product.active,
+    name: v.product.name,
+    slug: v.product.slug,
+    image: parseStringArray(v.product.images)[0] ?? null,
+    // Igual que la ficha al agregar: el tamaño solo se nombra si hay más de uno.
+    variantLabel: v.product._count.variants > 1 ? v.label : null,
   }));
 }

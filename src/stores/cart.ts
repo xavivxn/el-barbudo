@@ -25,7 +25,10 @@ type CartState = {
   clear: () => void;
   open: () => void;
   close: () => void;
-  /** Refresca precio y stock contra el servidor. Devuelve los nombres para el aviso. */
+  /**
+   * Refresca precio, stock, nombre, dirección, foto y tamaño contra el servidor. Devuelve los
+   * nombres para el aviso: solo cuentan lo quitado y lo recortado; el resto se actualiza sin aviso.
+   */
   reconcile: (snapshots: VariantSnapshot[]) => { removed: string[]; adjusted: string[] };
 };
 
@@ -84,8 +87,17 @@ export const useCart = create<CartState>()(
             continue;
           }
           const quantity = clampQuantity(item.quantity, snap.stock);
-          if (quantity < item.quantity) adjusted.push(item.name);
-          next.push({ ...item, unitPrice: snap.price, maxStock: snap.stock, quantity });
+          if (quantity < item.quantity) adjusted.push(snap.name);
+          next.push({
+            ...item,
+            name: snap.name,
+            slug: snap.slug,
+            image: snap.image,
+            variantLabel: snap.variantLabel,
+            unitPrice: snap.price,
+            maxStock: snap.stock,
+            quantity,
+          });
         }
 
         set({ items: next });

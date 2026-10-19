@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { cartCount, cartTotal, toOrderLines, useCart } from "@/stores/cart";
+import type { VariantSnapshot } from "@/lib/types";
+import { type CartItem, cartCount, cartTotal, toOrderLines, useCart } from "@/stores/cart";
 
 const noir100 = {
   variantId: "v-noir-100",
@@ -43,6 +44,21 @@ const deleted = {
 };
 
 const items = () => useCart.getState().items;
+
+/** Snapshot del servidor para un ítem: por defecto, los mismos datos que ya tiene el carrito. */
+function snapOf(item: Omit<CartItem, "quantity">, overrides: Partial<VariantSnapshot> = {}): VariantSnapshot {
+  return {
+    id: item.variantId,
+    price: item.unitPrice,
+    stock: item.maxStock,
+    available: true,
+    name: item.name,
+    slug: item.slug,
+    image: item.image,
+    variantLabel: item.variantLabel,
+    ...overrides,
+  };
+}
 
 beforeEach(() => {
   localStorage.clear();
@@ -117,8 +133,8 @@ describe("reconcile", () => {
     useCart.getState().add(deleted, 1);
 
     const r = useCart.getState().reconcile([
-      { id: noir100.variantId, price: 300000, stock: 2, available: true },
-      { id: soldOut.variantId, price: 1, stock: 0, available: true },
+      snapOf(noir100, { price: 300000, stock: 2 }),
+      snapOf(soldOut, { price: 1, stock: 0 }),
     ]);
 
     expect(items().find((i) => i.variantId === noir100.variantId)).toMatchObject({
@@ -140,7 +156,7 @@ describe("reconcile", () => {
   it("quita ítems de productos inactivos (available false)", () => {
     useCart.getState().add(aceite, 1);
     const r = useCart.getState().reconcile([
-      { id: aceite.variantId, price: 95000, stock: 5, available: false },
+      snapOf(aceite, { stock: 5, available: false }),
     ]);
     expect(items()).toHaveLength(0);
     expect(r).toEqual({ removed: ["Aceite de barba"], adjusted: [] });
@@ -149,7 +165,7 @@ describe("reconcile", () => {
   it("un cambio de precio solo actualiza, sin aviso", () => {
     useCart.getState().add(aceite, 2);
     const r = useCart.getState().reconcile([
-      { id: aceite.variantId, price: 99000, stock: 10, available: true },
+      snapOf(aceite, { price: 99000 }),
     ]);
     expect(items()[0]).toMatchObject({ unitPrice: 99000, quantity: 2 });
     expect(r).toEqual({ removed: [], adjusted: [] });
@@ -158,10 +174,40 @@ describe("reconcile", () => {
   it("subir el stock actualiza maxStock sin tocar la cantidad", () => {
     useCart.getState().add(noir100, 3);
     const r = useCart.getState().reconcile([
-      { id: noir100.variantId, price: 285000, stock: 9, available: true },
+      snapOf(noir100, { stock: 9 }),
     ]);
     expect(items()[0]).toMatchObject({ quantity: 3, maxStock: 9 });
     expect(r.adjusted).toEqual([]);
+  });
+});
+
+describe("reconcile actualiza los datos del producto", () => {
+  it("nombre, dirección, foto y tamaño nuevos se copian sin aviso", () => {
+    useCart.getState().add(noir100, 2);
+    const r = useCart.getState().reconcile([
+      snapOf(noir100, { name: "Noir Intense Elixir", slug: "noir-elixir", image: "/elixir.jpg", variantLabel: "100 ml EDP" }),
+    ]);
+    expect(items()[0]).toMatchObject({
+      name: "Noir Intense Elixir",
+      slug: "noir-elixir",
+      image: "/elixir.jpg",
+      variantLabel: "100 ml EDP",
+      quantity: 2,
+    });
+    expect(r).toEqual({ removed: [], adjusted: [] });
+    expect(toOrderLines(items())[0]).toMatchObject({ name: "Noir Intense Elixir", variantLabel: "100 ml EDP" });
+  });
+
+  it("si al producto le quitaron variantes y queda una sola, el tamaño deja de nombrarse", () => {
+    useCart.getState().add(noir100, 1);
+    useCart.getState().reconcile([snapOf(noir100, { variantLabel: null })]);
+    expect(items()[0].variantLabel).toBeNull();
+  });
+
+  it("un producto renombrado y recortado avisa con el nombre nuevo", () => {
+    useCart.getState().add(noir100, 4);
+    const r = useCart.getState().reconcile([snapOf(noir100, { name: "Noir Elixir", stock: 1 })]);
+    expect(r.adjusted).toEqual(["Noir Elixir"]);
   });
 });
 

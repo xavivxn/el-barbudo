@@ -30,6 +30,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`${cormorant.variable} ${inter.variable}`}
     >
+      <head>
+        {/* Sin JS, motion no anima la entrada: lo que va con <Reveal> se muestra igual. */}
+        <noscript>
+          <style>{"[data-reveal]{opacity:1!important;transform:none!important}"}</style>
+        </noscript>
+      </head>
       <body className="min-h-dvh bg-bg font-sans text-fg antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <MotionProvider>{children}</MotionProvider>

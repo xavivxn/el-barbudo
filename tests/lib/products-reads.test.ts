@@ -57,19 +57,54 @@ describe("getProductBySlug", () => {
 });
 
 describe("getVariantSnapshots", () => {
+  const product = (over: Record<string, unknown> = {}) => ({
+    active: true,
+    name: "Bleu",
+    slug: "bleu",
+    images: '["https://x.com/a.jpg","https://x.com/b.jpg"]',
+    _count: { variants: 2 },
+    ...over,
+  });
+
   it("marca available según el producto y omite ids desconocidos", async () => {
     db.variant.findMany.mockResolvedValue([
-      { id: "v1", price: 100, stock: 3, product: { active: true } },
-      { id: "v2", price: 200, stock: 5, product: { active: false } },
+      { id: "v1", label: "50 ml", price: 100, stock: 3, product: product() },
+      { id: "v2", label: "30 ml", price: 200, stock: 5, product: product({ active: false, name: "Noir", slug: "noir" }) },
     ]);
     const out = await getVariantSnapshots(["v1", "v2", "desconocido"]);
     expect(out).toEqual([
-      { id: "v1", price: 100, stock: 3, available: true },
-      { id: "v2", price: 200, stock: 5, available: false },
+      {
+        id: "v1",
+        price: 100,
+        stock: 3,
+        available: true,
+        name: "Bleu",
+        slug: "bleu",
+        image: "https://x.com/a.jpg",
+        variantLabel: "50 ml",
+      },
+      {
+        id: "v2",
+        price: 200,
+        stock: 5,
+        available: false,
+        name: "Noir",
+        slug: "noir",
+        image: "https://x.com/a.jpg",
+        variantLabel: "30 ml",
+      },
     ]);
     expect(db.variant.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: { in: ["v1", "v2", "desconocido"] } } }),
     );
+  });
+
+  it("con una sola variante no nombra el tamaño; sin fotos la imagen es null", async () => {
+    db.variant.findMany.mockResolvedValue([
+      { id: "v1", label: "Única", price: 100, stock: 3, product: product({ images: "[]", _count: { variants: 1 } }) },
+    ]);
+    const [snapshot] = await getVariantSnapshots(["v1"]);
+    expect(snapshot).toMatchObject({ variantLabel: null, image: null, name: "Bleu", slug: "bleu" });
   });
 
   it("no consulta la base con una lista vacía", async () => {
