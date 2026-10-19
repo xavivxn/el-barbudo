@@ -10,6 +10,7 @@
   --line: #e6e2da;
   --accent: #9a7b4f;
   --ok: #3f6b52;
+  --danger: #b3261e;
   --whatsapp: #25d366;
 }
 
@@ -21,6 +22,7 @@
   --line: #2e2c29;
   --accent: #c9a66b;
   --ok: #7fa68f;
+  --danger: #f2b8b5;
   --whatsapp: #25d366;
 }
 
@@ -32,6 +34,7 @@
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-ok: var(--ok);
+  --color-danger: var(--danger);
   --color-whatsapp: var(--whatsapp);
   --font-serif: var(--font-cormorant), Georgia, serif;
   --font-sans: var(--font-inter), system-ui, sans-serif;
