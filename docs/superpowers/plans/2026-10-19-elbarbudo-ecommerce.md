@@ -473,3 +473,47 @@ expect(fieldErrors(serviceSchema.safeParse({ name: "", description: "", price: "
 - [ ] **Step 5:** `README.md`: requisitos, `cp .env.example .env`, `npm install`, `npx prisma migrate dev`, `npx prisma db seed`, `npm run dev`, `npm test`; sección "Desplegar en Vercel": crear base en Neon, cambiar `provider = "postgresql"` en `schema.prisma`, reemplazar el adapter de `db.ts` por `@prisma/adapter-pg` (o el que indique Prisma 7 para Postgres), borrar `prisma/migrations` y correr `npx prisma migrate dev --name init` contra Neon, `npx prisma db seed`, cargar las 4 variables de entorno en Vercel, `build` = `prisma generate && next build`. Nota: el logo actual es un JPG de 150 px; pedir a la marca un SVG.
 - [ ] **Step 6:** `npm test` → todo PASS; `npm run lint` → sin errores; `rm dev.db && npx prisma migrate reset --force` → base y seed desde cero OK; `npm run build` → sin errores.
 - [ ] **Step 7:** Commit `docs: README y pulido de accesibilidad`.
+
+---
+
+### Task 14: Portada = tienda (cambio pedido por el cliente, 2026-10-19)
+
+> El cliente revisó la portada de la Task 6: "la idea es vender los productos, no mostrar qué hace". La portada pasa a ser la tienda. La marca y los servicios se mudan a `/barberia`. Se ejecuta después de la Task 8 y antes de la Task 9.
+
+**Files:**
+- Modify: `src/app/(shop)/page.tsx`, `src/components/shop/Header.tsx`, `src/app/globals.css`
+- Create: `src/app/(shop)/barberia/page.tsx`, `src/components/shop/StoreIntro.tsx`, `src/components/shop/CategorySection.tsx`, `src/lib/home.ts`
+- Delete: `src/components/shop/Hero.tsx` y `CategoryLinks.tsx` (y la keyframe `hero-in`) si quedan sin uso
+- Test: `tests/lib/home.test.ts`
+
+**Interfaces:**
+- Consumes: `listProducts`, `listServices`, `ProductGrid`, `ProductCard`, `Chip`, `CATEGORIES`, `AboutSection`, `ServicesList`, `Button`, `site`.
+- Produces: `groupByCategory(products: ProductDTO[], perSection?: number): { category: (typeof CATEGORIES)[number]; products: ProductDTO[]; total: number }[]` en `src/lib/home.ts`. Sigue el orden de `CATEGORIES`, omite las categorías vacías y usa `perSection` 4 por defecto.
+
+- [ ] **Step 1: Test**
+
+```ts
+const groups = groupByCategory([perfume1, barba1, perfume2, perfume3, perfume4, perfume5, cabello1]);
+expect(groups.map(g => g.category.value)).toEqual(["perfume", "barba", "cabello"]);
+expect(groups[0].products).toHaveLength(4);
+expect(groups[0].total).toBe(5);
+expect(groupByCategory([barba1]).map(g => g.category.value)).toEqual(["barba"]);   // omite vacías
+expect(groupByCategory([])).toEqual([]);
+```
+
+- [ ] **Step 2:** `npm test` → FAIL. Implementar → PASS.
+- [ ] **Step 3: Portada `/`** (`dynamic = "force-dynamic"`). Todo lo que está sobre el pliegue se ve sin JS: no se usa `Reveal` hasta después de "Destacados". De arriba hacia abajo:
+  - `StoreIntro`: banda compacta sin foto a pantalla completa. Línea chica con tracking ("PERFUMERÍA · BARBA · CABELLO"), h1 serif de 36 px en móvil y 56 px en desktop ("Perfumes y cuidado para el hombre"), y una línea de apoyo ("Elegí, pedí por WhatsApp y te confirmamos al toque."). Alto total ≤ 220 px en móvil. En el primer pantallazo a 375 px ya tienen que verse productos.
+  - Fila de chips de categoría ("Todos", "Perfumes", "Barba", "Cabello") que linkean a `/productos?categoria=<slug>`. Usa `Chip`, scrollea horizontal en móvil.
+  - "Destacados": `ProductGrid` con los productos destacados.
+  - Una sección por categoría (`CategorySection`): título serif con el nombre de la categoría, enlace "Ver todos (N)" a `/productos?categoria=<slug>` y `ProductGrid` con hasta 4 productos. Los datos salen de `groupByCategory(await listProducts())`.
+  - Al final, un bloque angosto (una fila, no un hero) de barbería: "¿Corte o barba? Reservá tu turno en la barbería." con `Button secondary` "Ver servicios" → `/barberia`.
+- [ ] **Step 4: Página `/barberia`** (`dynamic = "force-dynamic"`): `AboutSection` + `ServicesList` (mantiene `id="servicios"`), con título de página serif "La barbería". `generateMetadata` → "La barbería — El Barbudo".
+- [ ] **Step 5: Header**: queda sólido en todas las rutas, sin modo transparente sobre el hero (se quita la lógica `overHero`, sus tokens y el `-mb-14`). El ítem de nav "Servicios" (`/#servicios`) pasa a "La barbería" → `/barberia`, con `aria-current="page"` cuando estás ahí. Footer: si enlaza a `/#servicios`, apuntarlo a `/barberia`.
+- [ ] **Step 6:** Borrar `Hero.tsx`, `CategoryLinks.tsx` y la keyframe `hero-in` si quedaron sin uso; borrar o actualizar los tests que los referencian. Si `site.about.image` se sigue usando, queda.
+- [ ] **Step 7:** Verificar con curl y en el navegador a 375 px y 1280 px, en claro y en oscuro:
+  - en `/` se ven productos en el primer pantallazo;
+  - el header es sólido;
+  - `/barberia` muestra marca y servicios con sus enlaces "Reservar";
+  - no hay scroll horizontal.
+- [ ] **Step 8:** Commit `feat: portada como tienda y página de la barbería`.
