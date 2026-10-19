@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { verifyPassword } from "@/lib/auth";
+import { PLACEHOLDER_ADMIN_PASSWORD, verifyPassword } from "@/lib/auth";
 
 describe("verifyPassword", () => {
   afterEach(() => vi.unstubAllEnvs());
@@ -29,5 +30,31 @@ describe("verifyPassword", () => {
     vi.stubEnv("ADMIN_PASSWORD", "barba123");
     expect(verifyPassword("barba123")).toBe(true);
     expect(verifyPassword("otra")).toBe(false);
+  });
+
+  describe("valor de ejemplo de .env.example", () => {
+    it("coincide con el de .env.example", () => {
+      const example = readFileSync(".env.example", "utf8");
+      expect(example).toContain(`ADMIN_PASSWORD="${PLACEHOLDER_ADMIN_PASSWORD}"`);
+    });
+
+    it("en producción nunca entra, ni con la contraseña exacta, y no la escribe en el log", () => {
+      vi.stubEnv("NODE_ENV", "production");
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      expect(verifyPassword(PLACEHOLDER_ADMIN_PASSWORD, PLACEHOLDER_ADMIN_PASSWORD)).toBe(false);
+      expect(log).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(log.mock.calls)).not.toContain(PLACEHOLDER_ADMIN_PASSWORD);
+      log.mockRestore();
+    });
+
+    it("en producción una contraseña propia sigue funcionando", () => {
+      vi.stubEnv("NODE_ENV", "production");
+      expect(verifyPassword("una-clave-larga-y-unica", "una-clave-larga-y-unica")).toBe(true);
+    });
+
+    it("fuera de producción el valor de ejemplo se acepta (desarrollo local)", () => {
+      vi.stubEnv("NODE_ENV", "development");
+      expect(verifyPassword(PLACEHOLDER_ADMIN_PASSWORD, PLACEHOLDER_ADMIN_PASSWORD)).toBe(true);
+    });
   });
 });

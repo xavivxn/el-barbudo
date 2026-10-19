@@ -10,12 +10,13 @@ const blend = "mix-blend-multiply dark:invert dark:mix-blend-screen";
 
 export function Logo({ variant = "full", className = "" }: LogoProps) {
   if (variant === "mark") {
+    // Decorativa: siempre va junto al wordmark o dentro de un enlace con nombre.
     // Recorta solo la barba: imagen ampliada y anclada arriba, sin el wordmark.
     return (
       <span className={`relative inline-block h-10 w-10 shrink-0 overflow-hidden ${className}`}>
         <Image
           src="/logo.jpg"
-          alt="El Barbudo"
+          alt=""
           width={150}
           height={150}
           priority

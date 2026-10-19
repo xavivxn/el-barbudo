@@ -151,17 +151,18 @@ export function CartDrawer() {
           </button>
         </div>
 
-        {/* Siempre montado: un aviso que aparece en una región ya existente se anuncia de forma fiable,
-            y se ve también si el ajuste dejó el carrito vacío. */}
-        <div role="status" className="shrink-0 px-4 md:px-6">
-          {notice ? (
-            <p className="mt-4 border-l-4 border-accent bg-surface px-4 py-3 text-sm">{notice}</p>
-          ) : null}
-        </div>
+        {/* Aviso y lista comparten un solo scroll: un aviso largo (varios ítems quitados) no le quita
+            lugar a la lista en pantallas bajas. El aviso se monta siempre: uno que aparece en una región
+            ya existente se anuncia de forma fiable, y se ve también si el ajuste vació el carrito. */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 md:px-6">
+          <div role="status" className="shrink-0">
+            {notice ? (
+              <p className="mt-4 border-l-4 border-accent bg-surface px-4 py-3 text-sm">{notice}</p>
+            ) : null}
+          </div>
 
-        {hydrated && items.length > 0 ? (
-          <>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 md:px-6">
+          {hydrated && items.length > 0 ? (
+            <>
               <p aria-live="polite" className="text-sm text-muted empty:hidden">
                 {refreshing ? "Actualizando…" : ""}
               </p>
@@ -175,52 +176,54 @@ export function CartDrawer() {
                   />
                 ))}
               </ul>
-            </div>
-
-            <div className="shrink-0 border-t border-line px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 md:px-6">
-              <div className="flex items-baseline justify-between gap-4">
-                <p className="text-sm uppercase tracking-[0.16em] text-muted">Total estimado</p>
-                <p className="font-serif text-3xl font-medium tabular-nums">{formatPYG(total)}</p>
-              </div>
-              <p className="mt-1 text-sm text-muted">
-                Confirmamos stock, entrega y pago por WhatsApp.
-              </p>
-
-              <p id="cart-preview-label" className="mt-4 text-sm uppercase tracking-[0.16em] text-muted">
-                Mensaje que vas a enviar
-              </p>
-              <div
-                role="region"
-                aria-labelledby="cart-preview-label"
-                tabIndex={0}
-                className={`mt-2 max-h-[30dvh] overflow-y-auto whitespace-pre-line rounded-none rounded-r-lg border-l-4 border-accent bg-surface px-4 py-3 text-sm ${focusRing}`}
-              >
-                {message}
-              </div>
-
+            </>
+          ) : hydrated ? (
+            <div className="flex flex-1 flex-col items-start justify-center gap-4 py-8">
+              <h3 className="font-serif text-3xl font-medium">Tu carrito está vacío</h3>
+              <p className="text-muted">Mirá los productos y armá tu pedido.</p>
               <Button
-                variant="whatsapp"
-                href={whatsappUrl(message)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 w-full"
+                variant="primary"
+                href="/productos"
+                onClick={() => dialogRef.current?.close()}
               >
-                <WhatsAppIcon />
-                Enviar pedido por WhatsApp
-                <span className="sr-only"> (se abre en una pestaña nueva)</span>
+                Ver catálogo
               </Button>
             </div>
-          </>
-        ) : hydrated ? (
-          <div className="flex flex-1 flex-col items-start justify-center gap-4 px-4 md:px-6">
-            <h3 className="font-serif text-3xl font-medium">Tu carrito está vacío</h3>
-            <p className="text-muted">Mirá los productos y armá tu pedido.</p>
-            <Button
-              variant="primary"
-              href="/productos"
-              onClick={() => dialogRef.current?.close()}
+          ) : null}
+        </div>
+
+        {hydrated && items.length > 0 ? (
+          <div className="shrink-0 border-t border-line px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 md:px-6">
+            <div className="flex items-baseline justify-between gap-4">
+              <p className="text-sm uppercase tracking-[0.16em] text-muted">Total estimado</p>
+              <p className="font-serif text-3xl font-medium tabular-nums">{formatPYG(total)}</p>
+            </div>
+            <p className="mt-1 text-sm text-muted">
+              Confirmamos stock, entrega y pago por WhatsApp.
+            </p>
+
+            <p id="cart-preview-label" className="mt-4 text-sm uppercase tracking-[0.16em] text-muted">
+              Mensaje que vas a enviar
+            </p>
+            <div
+              role="region"
+              aria-labelledby="cart-preview-label"
+              tabIndex={0}
+              className={`mt-2 max-h-[20dvh] overflow-y-auto whitespace-pre-line rounded-none rounded-r-lg border-l-4 border-accent bg-surface px-4 py-3 text-sm ${focusRing}`}
             >
-              Ver catálogo
+              {message}
+            </div>
+
+            <Button
+              variant="whatsapp"
+              href={whatsappUrl(message)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 w-full"
+            >
+              <WhatsAppIcon />
+              Enviar pedido por WhatsApp
+              <span className="sr-only"> (se abre en una pestaña nueva)</span>
             </Button>
           </div>
         ) : null}

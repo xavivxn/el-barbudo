@@ -16,7 +16,14 @@ function priceLabel(product: ProductDTO, priced: ProductDTO["variants"]): string
   return product.variants.length > 1 ? `Desde ${amount}` : amount;
 }
 
-export function ProductCard({ product }: { product: ProductDTO }) {
+type ProductCardProps = {
+  product: ProductDTO;
+  /** Nivel del título según el contexto: h3 bajo una sección (h2), h2 directo bajo el h1 del catálogo. */
+  headingLevel?: 2 | 3;
+};
+
+export function ProductCard({ product, headingLevel = 3 }: ProductCardProps) {
+  const Heading = headingLevel === 2 ? "h2" : "h3";
   const href = `/productos/${product.slug}`;
   const soldOut = isSoldOut(product.variants);
   // Lo que se puede pedir hoy: el precio y el pedido salen de las variantes con stock.
@@ -53,11 +60,11 @@ export function ProductCard({ product }: { product: ProductDTO }) {
       </div>
 
       <div className="flex flex-1 flex-col pt-4">
-        <h3 className="font-serif text-xl font-medium leading-tight md:text-2xl">
-          <Link href={href} className={`underline-offset-4 hover:underline ${focusRing}`}>
+        <Heading className="font-serif text-xl font-medium leading-tight md:text-2xl">
+          <Link href={href} className={`-my-2.5 inline-block py-2.5 underline-offset-4 hover:underline ${focusRing}`}>
             {product.name}
           </Link>
-        </h3>
+        </Heading>
         {product.subtitle ? <p className="mt-1 text-muted">{product.subtitle}</p> : null}
 
         <div

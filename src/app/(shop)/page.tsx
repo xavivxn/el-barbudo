@@ -5,16 +5,13 @@ import { ProductGrid } from "@/components/shop/ProductGrid";
 import { StoreIntro } from "@/components/shop/StoreIntro";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
+import { ChipRow } from "@/components/ui/ChipRow";
 import { Reveal } from "@/components/ui/Reveal";
 import { groupByCategory } from "@/lib/home";
 import { listProducts } from "@/lib/products";
 import { CATEGORIES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-
-/** Móvil: una línea con scroll horizontal; el padding vertical deja sitio al anillo de foco. */
-const chipRow =
-  "-mx-4 flex gap-2 overflow-x-auto px-4 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible md:px-0";
 
 export default async function HomePage() {
   const products = await listProducts();
@@ -27,7 +24,7 @@ export default async function HomePage() {
       <StoreIntro />
 
       <nav aria-label="Categorías">
-        <ul className={chipRow}>
+        <ChipRow>
           <li className="shrink-0">
             <Chip href="/productos" className="whitespace-nowrap">
               Todos
@@ -40,7 +37,7 @@ export default async function HomePage() {
               </Chip>
             </li>
           ))}
-        </ul>
+        </ChipRow>
       </nav>
 
       <div className="mt-8 space-y-16 md:mt-12 md:space-y-24">

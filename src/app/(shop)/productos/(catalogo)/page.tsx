@@ -53,6 +53,7 @@ export default async function CatalogPage(props: PageProps<"/productos">) {
 
       <ProductGrid
         products={products}
+        headingLevel={2}
         empty={
           <div className="flex flex-col items-start gap-2">
             <p>No hay productos en esta categoría todavía</p>

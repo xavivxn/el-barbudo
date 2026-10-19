@@ -24,7 +24,8 @@ const redirect = vi.hoisted(() =>
 );
 vi.mock("next/navigation", () => ({ redirect }));
 
-import { getSession, requireAdmin } from "@/lib/auth";
+import { readFileSync } from "node:fs";
+import { getSession, PLACEHOLDER_SESSION_SECRET, requireAdmin } from "@/lib/auth";
 
 beforeEach(() => {
   store.jar.clear();
@@ -79,5 +80,28 @@ describe("getSession", () => {
     vi.stubEnv("SESSION_SECRET", "corta");
     await expect(requireAdmin()).rejects.toThrow(/SESSION_SECRET/);
     expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("el valor de ejemplo coincide con el de .env.example", () => {
+    expect(readFileSync(".env.example", "utf8")).toContain(
+      `SESSION_SECRET="${PLACEHOLDER_SESSION_SECRET}"`,
+    );
+  });
+
+  it("en producción rechaza el SESSION_SECRET de .env.example sin repetirlo en el error", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SESSION_SECRET", PLACEHOLDER_SESSION_SECRET);
+    const error = await getSession().catch((e: Error) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/SESSION_SECRET/);
+    expect((error as Error).message).not.toContain(PLACEHOLDER_SESSION_SECRET);
+    await expect(requireAdmin()).rejects.toThrow(/SESSION_SECRET/);
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("en producción un SESSION_SECRET propio funciona", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    store.jar.set("eb_admin", await sealedCookie({ isAdmin: true }));
+    await expect(requireAdmin()).resolves.toBeUndefined();
   });
 });

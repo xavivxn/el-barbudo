@@ -86,6 +86,14 @@ describe("ProductCard", () => {
     expect(decodedHref(order)).toContain("• 1 × Noche de Cuero (50 ml) — ₲ 450.000");
   });
 
+  it("el nombre es un h3 por defecto y un h2 si se pide (grilla justo bajo el h1)", () => {
+    const { rerender } = render(<ProductCard product={perfumeTwoVariants} />);
+    expect(screen.getByRole("heading", { level: 3, name: "Noche de Cuero" })).toBeInTheDocument();
+
+    rerender(<ProductCard product={perfumeTwoVariants} headingLevel={2} />);
+    expect(screen.getByRole("heading", { level: 2, name: "Noche de Cuero" })).toBeInTheDocument();
+  });
+
   it("enlaza la imagen y el nombre a la ficha del producto", () => {
     const { container } = render(<ProductCard product={perfumeTwoVariants} />);
 

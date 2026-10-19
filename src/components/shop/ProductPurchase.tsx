@@ -148,7 +148,7 @@ function InStockPurchase({ product }: { product: ProductDTO }) {
                     className={`flex min-h-14 min-w-28 cursor-pointer flex-col justify-center rounded-2xl border border-line px-4 py-2 transition-colors duration-200 hover:border-fg peer-checked:border-fg peer-checked:bg-fg peer-checked:text-bg peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent peer-disabled:cursor-not-allowed peer-disabled:border-dashed peer-disabled:text-muted peer-disabled:hover:border-line`}
                   >
                     <span className="font-medium">{v.label}</span>
-                    <span className="text-sm tabular-nums opacity-80">
+                    <span className="text-sm tabular-nums">
                       {unavailable ? "Agotado" : formatPYG(v.price)}
                     </span>
                   </span>

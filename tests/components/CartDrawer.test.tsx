@@ -75,6 +75,19 @@ function snap(id: string, overrides: Partial<VariantSnapshot> = {}): VariantSnap
 }
 
 describe("CartDrawer", () => {
+  it("el aviso y la lista comparten el scroll: un aviso largo no encoge la lista", async () => {
+    refresh.mockResolvedValue([snap("noir-100"), snap("gone", { available: false })]);
+    useCart.setState({ items: [noirQty3, borrado], isOpen: true });
+
+    render(<CartDrawer />);
+
+    const status = await screen.findByRole("status");
+    await waitFor(() => expect(status).toHaveTextContent("Producto borrado"));
+    const list = screen.getByRole("list");
+    expect(status.parentElement).toBe(list.parentElement);
+    expect(status.parentElement).toHaveClass("overflow-y-auto");
+  });
+
   it("al abrir reconcilia con el servidor, avisa qué cambió y recalcula total y mensaje", async () => {
     refresh.mockResolvedValue([
       snap("noir-100", { price: 285000, stock: 1 }),
