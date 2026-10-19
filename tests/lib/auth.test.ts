@@ -19,6 +19,19 @@ describe("verifyPassword", () => {
     expect(verifyPassword("", "barba123")).toBe(false);
   });
 
+  it("ignora espacios y comillas alrededor de la contraseña configurada (pegada desde .env)", () => {
+    for (const pasted of ['"barba123"', "'barba123'", "  barba123 \n", ' "barba123" ']) {
+      expect(verifyPassword("barba123", pasted)).toBe(true);
+    }
+    expect(verifyPassword("barba12", '"barba123"')).toBe(false);
+  });
+
+  it("una contraseña configurada que solo tiene comillas o espacios nunca entra", () => {
+    expect(verifyPassword("x", '""')).toBe(false);
+    expect(verifyPassword('""', '""')).toBe(false);
+    expect(verifyPassword("x", "   ")).toBe(false);
+  });
+
   it("sin ADMIN_PASSWORD configurada nunca entra", () => {
     // `undefined` activa el valor por defecto (process.env): se vacía para que el caso sea determinista.
     vi.stubEnv("ADMIN_PASSWORD", "");

@@ -43,12 +43,12 @@ describe("mensajes de WhatsApp", () => {
 
 describe("whatsappUrl", () => {
   it("limpia el número a solo dígitos", () => {
-    expect(whatsappUrl("a", "+595 981 123-456")).toBe("https://wa.me/595981123456?text=a");
+    expect(whatsappUrl("a", "+595 000 111-222")).toBe("https://wa.me/595000111222?text=a");
   });
 
   it("conserva caracteres especiales intactos", () => {
     const tricky = "Café & Co #1?\nsí 👋";
-    const url = whatsappUrl(tricky, "595981123456");
+    const url = whatsappUrl(tricky, "595000111222");
     expect(new URL(url).searchParams.get("text")).toBe(tricky);
   });
 

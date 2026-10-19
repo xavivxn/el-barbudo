@@ -13,15 +13,18 @@ export const PLACEHOLDER_SESSION_SECRET = "cambiar-por-un-secreto-de-al-menos-32
 
 const isProduction = () => process.env.NODE_ENV === "production";
 
-/** Ignora espacios y comillas que quedan al pegar el valor desde `.env.example` en el panel del hosting. */
-const isPlaceholder = (value: string, placeholder: string) =>
-  value.trim().replace(/^["']+|["']+$/g, "").trim() === placeholder;
+/** Quita espacios y comillas que quedan al pegar un valor de `.env` en el panel del hosting. */
+const unquote = (value: string) => value.trim().replace(/^["']+|["']+$/g, "").trim();
+
+const isPlaceholder = (value: string, placeholder: string) => unquote(value) === placeholder;
 
 const sha256 = (value: string) => createHash("sha256").update(value).digest();
 
 /**
  * Compara en tiempo constante. Se comparan los SHA-256 de ambas cadenas (siempre 32 bytes)
  * para que `timingSafeEqual` no falle por largos distintos ni filtre el largo de la contraseña.
+ * La configurada se compara sin espacios ni comillas alrededor (como la ve `isPlaceholder`), así
+ * un valor pegado como `"mi-clave"` sigue funcionando.
  * Sin contraseña configurada o con entrada vacía, nunca entra. En producción tampoco entra
  * si la contraseña configurada es la de ejemplo de `.env.example` (se avisa en el log, sin el valor).
  */
@@ -29,14 +32,15 @@ export function verifyPassword(
   input: string,
   expected: string | undefined = process.env.ADMIN_PASSWORD,
 ): boolean {
-  if (!input || !expected) return false;
-  if (isProduction() && isPlaceholder(expected, PLACEHOLDER_ADMIN_PASSWORD)) {
+  const password = expected ? unquote(expected) : "";
+  if (!input || !password) return false;
+  if (isProduction() && password === PLACEHOLDER_ADMIN_PASSWORD) {
     console.error(
       "ADMIN_PASSWORD tiene el valor de ejemplo de .env.example: el acceso al admin queda bloqueado hasta definir una contraseña propia.",
     );
     return false;
   }
-  return timingSafeEqual(sha256(input), sha256(expected));
+  return timingSafeEqual(sha256(input), sha256(password));
 }
 
 function sessionOptions(): SessionOptions {

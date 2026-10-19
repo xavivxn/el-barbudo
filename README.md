@@ -6,7 +6,7 @@ Next.js 16 (App Router) · React 19 · Tailwind CSS 4 · Prisma 7 con SQLite en 
 
 ## Requisitos
 
-- Node.js 20.19 o superior (recomendado: 22 LTS o más nuevo) y npm. Es el mínimo que exige Prisma 7 (`^20.19 || ^22.12 || >=24`); `package.json` lo declara en `engines`.
+- Node.js `^20.19.0 || ^22.12.0 || >=24.0.0` (recomendado: 22 LTS o más nuevo) y npm. Es el rango que exige Prisma 7; `package.json` lo declara igual en `engines`.
 - Un compilador de C/C++ disponible solo si `better-sqlite3` no trae binario para tu sistema (ver "Avisos de npm").
 
 ## Puesta en marcha local
@@ -31,9 +31,9 @@ Documentadas en `.env.example`:
 | `DATABASE_URL` | Conexión a la base. En local: `file:./dev.db`. |
 | `ADMIN_PASSWORD` | Contraseña única del panel `/admin`. |
 | `SESSION_SECRET` | Secreto que sella la cookie de sesión. Mínimo 32 caracteres. |
-| `NEXT_PUBLIC_WHATSAPP_NUMBER` | Número del local, solo dígitos con código de país (ej. `595981123456`). Next lo incorpora al código en el build: si lo cambiás, hay que volver a desplegar. |
+| `NEXT_PUBLIC_WHATSAPP_NUMBER` | Número del local, solo dígitos con código de país (ej. `5959XXXXXXXX`). Next lo incorpora al código en el build: si lo cambiás, hay que volver a desplegar. El de `.env.example` (`595000000000`) es un marcador que no es de nadie; si falta la variable, los enlaces usan ese mismo marcador de `src/site.ts`. |
 
-Con `NODE_ENV=production` la aplicación rechaza los valores de ejemplo de `.env.example`: con el `SESSION_SECRET` de ejemplo el admin falla con un error claro, y con la `ADMIN_PASSWORD` de ejemplo nadie puede entrar (el log avisa, sin escribir el valor). `DATABASE_URL` es obligatoria fuera de desarrollo y pruebas, tanto en la app como en `prisma.config.ts`.
+Con `NODE_ENV=production` la aplicación rechaza los valores de ejemplo de `.env.example`: con el `SESSION_SECRET` de ejemplo el admin falla con un error claro, y con la `ADMIN_PASSWORD` de ejemplo nadie puede entrar (el log avisa, sin escribir el valor). `DATABASE_URL` es obligatoria fuera de desarrollo y pruebas, tanto en la app como en `prisma.config.ts`. Si `ADMIN_PASSWORD` se pega con comillas o espacios alrededor (`"mi-clave"`), se ignoran.
 
 Para generar un secreto: `openssl rand -base64 48`.
 
@@ -45,7 +45,7 @@ Para generar un secreto: `openssl rand -base64 48`.
 
 - **Datos del local** en `src/site.ts`: dirección, horarios, Instagram, número de WhatsApp de respaldo y los textos de "Sobre El Barbudo" son datos de ejemplo.
 - **Fotos de productos**: las del seed son marcadores de posición. Reemplazalas desde el admin (`/admin`, editar producto) pegando las URLs `https://` de las fotos reales, una por línea. Algunos productos no tienen foto y muestran un marcador neutro.
-- **Logo**: `public/logo.jpg` es un JPG de 150 px, así que se ve algo suave al ampliarlo. Pedí a la marca el logo en SVG. Cambiar solo el archivo no alcanza: es un único componente, `src/components/ui/Logo.tsx`, usado en 3 lugares (Header, Footer y login del admin), y está pensado para ese JPG negro sobre blanco: la variante `mark` recorta la barba con posiciones fijas, ambas variantes pasan `width`/`height` de 150, y las clases `mix-blend-multiply dark:invert dark:mix-blend-screen` mezclan el fondo blanco y lo invierten en modo oscuro. Con un SVG hay que editar ese componente: actualizar `src`, rehacer o quitar el recorte de `mark` (conviene un SVG propio de solo la barba) y reemplazar el mezclado/inversión por `currentColor` o por una versión clara y otra oscura.
+- **Logo**: `public/logo.jpg` es un JPG de 150 px, así que se ve algo suave al ampliarlo. Pedí a la marca el logo en SVG. Cambiar solo el archivo no alcanza: es un único componente, `src/components/ui/Logo.tsx`, usado en 3 lugares (Header, Footer y login del admin), y está pensado para ese JPG negro sobre blanco: la variante `mark` recorta la barba con posiciones fijas, ambas variantes pasan `width`/`height` de 150, y las clases `mix-blend-multiply dark:invert dark:mix-blend-screen` mezclan el fondo blanco y lo invierten en modo oscuro. Con un SVG hay que editar ese componente: actualizar `src`, rehacer o quitar el recorte de `mark` (conviene un SVG propio de solo la barba) y reemplazar el mezclado/inversión por `currentColor` o por una versión clara y otra oscura. Los íconos de la pestaña y de iOS (`src/app/icon.png`, 192 px, y `src/app/apple-icon.png`, 180 px) son la barba recortada de ese mismo JPG: rehacelos con el logo nuevo.
 
 ## Seguridad del admin
 
@@ -80,6 +80,13 @@ En local se usa SQLite. En producción necesitás una base persistente: Vercel n
    DATABASE_URL="postgresql://USUARIO:CLAVE@ep-xxxx.region.aws.neon.tech/neondb?sslmode=require" \
      npx prisma migrate dev --name init
    ```
+   `migrate dev` contra Neon es **solo para este primer `init`, con la base vacía**: puede pedir resetear la base y borrar los datos. Contra la base de producción, después, solo `prisma migrate deploy` (paso 6).
+
+   **Desarrollo local después del cambio.** Con el esquema en `postgresql`, el `file:./dev.db` de SQLite deja de servir. Elegí una de estas dos y poné su URL en tu `.env` como `DATABASE_URL`:
+   - **Postgres local** (por ejemplo `docker run --name elbarbudo-db -e POSTGRES_PASSWORD=dev -p 5432:5432 -d postgres:17`, con `DATABASE_URL="postgresql://postgres:dev@localhost:5432/postgres"`).
+   - **Una rama de desarrollo de Neon** (Branches → Create branch), con su URL directa. Es una copia aparte: lo que hagas ahí no toca producción.
+
+   Ahí sí `npx prisma migrate dev` crea las migraciones nuevas y `npx prisma db seed` carga los datos de prueba, como antes. Las migraciones se suben al repositorio y llegan a producción con `migrate deploy`.
 4. **Cargá el contenido real** desde el admin. Si querés datos de prueba en una base de staging, el seed los crea, pero **borra todo** (ver arriba). Mismo patrón, con la URL directa:
    ```bash
    DATABASE_URL="postgresql://USUARIO:CLAVE@ep-xxxx.region.aws.neon.tech/neondb?sslmode=require" \
@@ -87,7 +94,7 @@ En local se usa SQLite. En producción necesitás una base persistente: Vercel n
    ```
 5. **Variables de entorno en Vercel** (Project Settings → Environment Variables), las 4, con valores fuertes y propios, distintos de los de `.env.example`:
    `DATABASE_URL` (la **con pooler** de Neon), `ADMIN_PASSWORD`, `SESSION_SECRET` (32 o más caracteres) y `NEXT_PUBLIC_WHATSAPP_NUMBER`.
-6. **Build**: el comando por defecto de Vercel (`next build`) alcanza. El script `postinstall` ya corre `prisma generate` al instalar dependencias. No pongas `prisma migrate deploy` en el build con la variable `DATABASE_URL` del proyecto, porque es la del pooler. Las migraciones nuevas se aplican desde tu equipo con la URL directa:
+6. **Build**: el comando por defecto de Vercel (`next build`) alcanza. En el deploy de producción (`VERCEL_ENV=production`) el build **falla a propósito** si `NEXT_PUBLIC_WHATSAPP_NUMBER` falta, no tiene dígitos o es el marcador `595000000000`, o si falta `DATABASE_URL`, `ADMIN_PASSWORD` o `SESSION_SECRET`; el error nombra la variable, nunca su valor (`src/lib/env-check.ts`). Así no se publica una tienda que manda los pedidos a un número que no es del local. Los deploys de preview y el `npm run build` local no hacen esta comprobación; para probarla en tu equipo: `CHECK_PROD_ENV=1 npm run build`. El script `postinstall` ya corre `prisma generate` al instalar dependencias. No pongas `prisma migrate deploy` en el build con la variable `DATABASE_URL` del proyecto, porque es la del pooler. Las migraciones nuevas se aplican desde tu equipo con la URL directa:
    ```bash
    DATABASE_URL="postgresql://...(directa)..." npx prisma migrate deploy
    ```
