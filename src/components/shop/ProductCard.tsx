@@ -1,20 +1,10 @@
 import Link from "next/link";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
-import { formatPYG } from "@/lib/money";
-import { isSoldOut, minPrice } from "@/lib/stock";
+import { cardPricing } from "@/lib/pricing";
 import type { ProductDTO } from "@/lib/types";
-import { buildInquiryMessage, buildOrderMessage, whatsappUrl } from "@/lib/whatsapp";
 
 const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
-
-/** `priced`: las variantes cuyo precio vale mostrar (las que tienen stock, o todas si está agotado). */
-function priceLabel(product: ProductDTO, priced: ProductDTO["variants"]): string | null {
-  if (priced.length === 0) return null;
-  // "₲" y el número nunca se separan; en tarjetas angostas "Desde" baja sola de línea.
-  const amount = formatPYG(minPrice(priced)).replace(" ", "\u00A0");
-  return product.variants.length > 1 ? `Desde ${amount}` : amount;
-}
 
 type ProductCardProps = {
   product: ProductDTO;
@@ -25,12 +15,7 @@ type ProductCardProps = {
 export function ProductCard({ product, headingLevel = 3 }: ProductCardProps) {
   const Heading = headingLevel === 2 ? "h2" : "h3";
   const href = `/productos/${product.slug}`;
-  const soldOut = isSoldOut(product.variants);
-  // Lo que se puede pedir hoy: el precio y el pedido salen de las variantes con stock.
-  const available = product.variants.filter((variant) => variant.stock > 0);
-  const price = priceLabel(product, soldOut ? product.variants : available);
-  // Las variantes vienen ordenadas por precio: la primera con stock es la más barata.
-  const cheapest = available[0];
+  const { soldOut, label: price, orderHref, orderVariant: cheapest } = cardPricing(product);
 
   return (
     <article className="group flex h-full flex-col transition-transform duration-200 hover:-translate-y-0.5">
@@ -76,16 +61,7 @@ export function ProductCard({ product, headingLevel = 3 }: ProductCardProps) {
 
           {cheapest ? (
             <a
-              href={whatsappUrl(
-                buildOrderMessage([
-                  {
-                    name: product.name,
-                    variantLabel: product.variants.length > 1 ? cheapest.label : undefined,
-                    quantity: 1,
-                    unitPrice: cheapest.price,
-                  },
-                ]),
-              )}
+              href={orderHref}
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Pedir ${product.name} por WhatsApp`}
@@ -95,7 +71,7 @@ export function ProductCard({ product, headingLevel = 3 }: ProductCardProps) {
             </a>
           ) : (
             <a
-              href={whatsappUrl(buildInquiryMessage(product.name))}
+              href={orderHref}
               target="_blank"
               rel="noopener noreferrer"
               className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-fg px-4 text-sm font-medium transition-colors duration-200 hover:bg-fg hover:text-bg ${focusRing}`}
