@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ServiceList } from "@/components/admin/ServiceList";
@@ -171,21 +171,61 @@ describe("región de estado", () => {
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Servicio eliminado"));
   });
 
+  const failure = { errors: { price: "Ingresá un precio en guaraníes, sin decimales." } };
+
+  async function failSecondSave(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: "Editar Corte clásico" }));
+    await user.click(screen.getByRole("button", { name: "Guardar servicio" }));
+    await screen.findByRole("alert");
+  }
+
   it("un guardado fallido borra el aviso anterior", async () => {
-    actions.saveService
-      .mockResolvedValueOnce({ saved: true })
-      .mockResolvedValueOnce({ errors: { price: "Ingresá un precio en guaraníes, sin decimales." } });
+    actions.saveService.mockResolvedValueOnce({ saved: true }).mockResolvedValueOnce(failure);
     const user = userEvent.setup();
     render(<ServiceList services={services} />);
     await saveFirstPrice(user, "90000");
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Servicio guardado"));
 
-    await user.click(screen.getByRole("button", { name: "Editar Corte clásico" }));
-    await user.click(screen.getByRole("button", { name: "Guardar servicio" }));
-    await screen.findByRole("alert");
-    expect(screen.getByRole("status")).toBeEmptyDOMElement();
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    await failSecondSave(user);
+    // `onFailed` corre en un efecto posterior al render del error: se espera, no se asume.
+    await waitFor(() => expect(screen.getByRole("status")).toBeEmptyDOMElement());
+  });
+
+  it("un guardado fallido cancela el aviso que todavía estaba pendiente", async () => {
+    // Los temporizadores de 50 ms del aviso se retienen (no corren solos) y solo se ejecutan, al final,
+    // los que nadie canceló: es lo que haría el navegador pasado ese tiempo.
+    const realSetTimeout = globalThis.setTimeout;
+    const realClearTimeout = globalThis.clearTimeout;
+    const held = new Map<unknown, () => void>();
+    let nextId = 0;
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((cb: () => void, ms?: number, ...rest: unknown[]) => {
+      if (ms !== 50) return realSetTimeout(cb, ms, ...rest);
+      const id = `held-${nextId++}`;
+      held.set(id, cb);
+      return id as unknown as ReturnType<typeof setTimeout>;
+    }) as typeof setTimeout);
+    vi.spyOn(globalThis, "clearTimeout").mockImplementation(((id?: unknown) => {
+      if (typeof id === "string") held.delete(id);
+      else realClearTimeout(id as ReturnType<typeof setTimeout>);
+    }) as typeof clearTimeout);
+
+    try {
+      actions.saveService.mockResolvedValueOnce({ saved: true }).mockResolvedValueOnce(failure);
+      const user = userEvent.setup({ delay: null });
+      render(<ServiceList services={services} />);
+      await saveFirstPrice(user, "90000");
+      expect(held.size).toBe(1); // el aviso "Servicio guardado" está pendiente
+
+      await failSecondSave(user);
+      await waitFor(() => expect(held.size).toBe(0)); // el fallo lo canceló
+
+      await act(async () => {
+        for (const cb of held.values()) cb();
+      });
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 });
 

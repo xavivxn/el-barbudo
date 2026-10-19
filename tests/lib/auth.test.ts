@@ -47,6 +47,20 @@ describe("verifyPassword", () => {
       log.mockRestore();
     });
 
+    it("en producción también rechaza el valor de ejemplo pegado con comillas o espacios", () => {
+      vi.stubEnv("NODE_ENV", "production");
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      for (const pasted of [
+        `"${PLACEHOLDER_ADMIN_PASSWORD}"`,
+        `'${PLACEHOLDER_ADMIN_PASSWORD}'`,
+        `  ${PLACEHOLDER_ADMIN_PASSWORD} `,
+        ` "${PLACEHOLDER_ADMIN_PASSWORD}" `,
+      ]) {
+        expect(verifyPassword(pasted, pasted)).toBe(false);
+      }
+      log.mockRestore();
+    });
+
     it("en producción una contraseña propia sigue funcionando", () => {
       vi.stubEnv("NODE_ENV", "production");
       expect(verifyPassword("una-clave-larga-y-unica", "una-clave-larga-y-unica")).toBe(true);

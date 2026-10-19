@@ -99,6 +99,18 @@ describe("getSession", () => {
     expect(redirect).not.toHaveBeenCalled();
   });
 
+  it("en producción rechaza el valor de ejemplo pegado con comillas o espacios", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    for (const pasted of [
+      `"${PLACEHOLDER_SESSION_SECRET}"`,
+      `'${PLACEHOLDER_SESSION_SECRET}'`,
+      `  ${PLACEHOLDER_SESSION_SECRET}\n`,
+    ]) {
+      vi.stubEnv("SESSION_SECRET", pasted);
+      await expect(getSession()).rejects.toThrow(/SESSION_SECRET/);
+    }
+  });
+
   it("en producción un SESSION_SECRET propio funciona", async () => {
     vi.stubEnv("NODE_ENV", "production");
     store.jar.set("eb_admin", await sealedCookie({ isAdmin: true }));

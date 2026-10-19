@@ -6,13 +6,13 @@ Next.js 16 (App Router) · React 19 · Tailwind CSS 4 · Prisma 7 con SQLite en 
 
 ## Requisitos
 
-- Node.js 20.9 o superior y npm.
+- Node.js 20.19 o superior (recomendado: 22 LTS o más nuevo) y npm. Es el mínimo que exige Prisma 7 (`^20.19 || ^22.12 || >=24`); `package.json` lo declara en `engines`.
 - Un compilador de C/C++ disponible solo si `better-sqlite3` no trae binario para tu sistema (ver "Avisos de npm").
 
 ## Puesta en marcha local
 
 ```bash
-cp .env.example .env        # y completa los valores (ver abajo)
+cp .env.example .env        # y completá los valores (ver abajo)
 npm install                 # el postinstall corre `prisma generate`
 npx prisma migrate dev      # crea dev.db y aplica las migraciones
 npx prisma db seed          # carga productos y servicios de prueba
@@ -31,7 +31,7 @@ Documentadas en `.env.example`:
 | `DATABASE_URL` | Conexión a la base. En local: `file:./dev.db`. |
 | `ADMIN_PASSWORD` | Contraseña única del panel `/admin`. |
 | `SESSION_SECRET` | Secreto que sella la cookie de sesión. Mínimo 32 caracteres. |
-| `NEXT_PUBLIC_WHATSAPP_NUMBER` | Número del local, solo dígitos con código de país (ej. `595981123456`). |
+| `NEXT_PUBLIC_WHATSAPP_NUMBER` | Número del local, solo dígitos con código de país (ej. `595981123456`). Next lo incorpora al código en el build: si lo cambiás, hay que volver a desplegar. |
 
 Con `NODE_ENV=production` la aplicación rechaza los valores de ejemplo de `.env.example`: con el `SESSION_SECRET` de ejemplo el admin falla con un error claro, y con la `ADMIN_PASSWORD` de ejemplo nadie puede entrar (el log avisa, sin escribir el valor). `DATABASE_URL` es obligatoria fuera de desarrollo y pruebas, tanto en la app como en `prisma.config.ts`.
 
@@ -45,21 +45,23 @@ Para generar un secreto: `openssl rand -base64 48`.
 
 - **Datos del local** en `src/site.ts`: dirección, horarios, Instagram, número de WhatsApp de respaldo y los textos de "Sobre El Barbudo" son datos de ejemplo.
 - **Fotos de productos**: las del seed son marcadores de posición. Reemplazalas desde el admin (`/admin`, editar producto) pegando las URLs `https://` de las fotos reales, una por línea. Algunos productos no tienen foto y muestran un marcador neutro.
-- **Logo**: `public/logo.jpg` es un JPG de 150 px, así que se ve algo suave al ampliarlo. Pedir a la marca el logo en SVG y reemplazar el archivo (el componente `src/components/ui/Logo.tsx` lo usa en un solo lugar).
+- **Logo**: `public/logo.jpg` es un JPG de 150 px, así que se ve algo suave al ampliarlo. Pedí a la marca el logo en SVG. Cambiar solo el archivo no alcanza: es un único componente, `src/components/ui/Logo.tsx`, usado en 3 lugares (Header, Footer y login del admin), y está pensado para ese JPG negro sobre blanco: la variante `mark` recorta la barba con posiciones fijas, ambas variantes pasan `width`/`height` de 150, y las clases `mix-blend-multiply dark:invert dark:mix-blend-screen` mezclan el fondo blanco y lo invierten en modo oscuro. Con un SVG hay que editar ese componente: actualizar `src`, rehacer o quitar el recorte de `mark` (conviene un SVG propio de solo la barba) y reemplazar el mezclado/inversión por `currentColor` o por una versión clara y otra oscura.
 
 ## Seguridad del admin
 
-- La sesión es una **cookie sellada sin estado** (iron-session, 7 días): no hay sesiones en la base. Para **cerrar todas las sesiones** (por ejemplo si se filtró la contraseña) cambia `SESSION_SECRET` y vuelve a desplegar: todas las cookies existentes dejan de ser válidas.
-- **No hay límite de intentos de inicio de sesión.** Usa una contraseña larga y única (una frase de 4 o más palabras o un valor generado) y no la reutilices.
+- La sesión es una **cookie sellada sin estado** (iron-session, 7 días): no hay sesiones en la base. Para **cerrar todas las sesiones** (por ejemplo si se filtró la contraseña) cambiá `SESSION_SECRET` y volvé a desplegar: todas las cookies existentes dejan de ser válidas.
+- **No hay límite de intentos de inicio de sesión.** Usá una contraseña larga y única (una frase de 4 o más palabras o un valor generado) y no la reutilices.
 - Cada página y cada acción del panel comprueban la sesión por su cuenta; no dependen solo del layout.
 
 ## Desplegar en Vercel con Neon (Postgres)
 
-En local se usa SQLite. En producción necesitas una base persistente: Vercel no guarda archivos entre ejecuciones, así que `dev.db` no sirve allí. Esta guía usa Postgres en Neon.
+En local se usa SQLite. En producción necesitás una base persistente: Vercel no guarda archivos entre ejecuciones, así que `dev.db` no sirve allí. Esta guía usa Postgres en Neon.
 
-1. **Crea la base en Neon** y copia la cadena de conexión (`postgresql://...`).
-2. **Cambia el motor en un solo lugar** (el cliente y el esquema):
-   - `src/lib/prisma-client.ts`: reemplaza el adapter de SQLite por el de Postgres.
+1. **Creá la base en Neon** y copiá las dos cadenas de conexión que ofrece:
+   - la **directa** (sin `-pooler` en el host): para las migraciones y el seed. `prisma migrate` necesita una conexión directa; con el pooler puede fallar o quedarse esperando.
+   - la **con pooler** (host con `-pooler`): para la aplicación en Vercel, que abre muchas conexiones cortas.
+2. **Cambiá el motor en un solo lugar** (el cliente y el esquema):
+   - `src/lib/prisma-client.ts`: reemplazá el adapter de SQLite por el de Postgres.
      ```bash
      npm uninstall @prisma/adapter-better-sqlite3 better-sqlite3
      npm install @prisma/adapter-pg
@@ -69,18 +71,27 @@ En local se usa SQLite. En producción necesitas una base persistente: Vercel no
      // ...
      return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
      ```
-     Ajusta también el valor por defecto de desarrollo (`DEV_DATABASE_URL`) o define `DATABASE_URL` siempre.
+     Ajustá también `DEV_DATABASE_URL` (el valor por defecto de desarrollo) o definí siempre `DATABASE_URL`.
    - `prisma/schema.prisma`: `datasource db { provider = "postgresql" }`.
-   - `prisma.config.ts`, el seed y el resto de la app usan esa misma fábrica o `DATABASE_URL`; no hay más lugares que tocar.
-3. **Regenera las migraciones.** Las de `prisma/migrations` son específicas de SQLite: borra esa carpeta y crea la inicial contra Postgres:
+   - El seed y la app usan esa misma fábrica, así que no hay más código que cambiar. Lo único que queda mirar es el valor por defecto de desarrollo (`file:./dev.db`) que también está en `prisma.config.ts`: solo aplica con `NODE_ENV` de desarrollo o pruebas, pero conviene actualizarlo o quitarlo.
+3. **Regenerá las migraciones.** Las de `prisma/migrations` son específicas de SQLite: borrá esa carpeta y creá la inicial contra Postgres. Tu `.env` local sigue apuntando a SQLite, así que pasá la URL directa en el propio comando:
    ```bash
    rm -rf prisma/migrations
-   DATABASE_URL="postgresql://..." npx prisma migrate dev --name init
+   DATABASE_URL="postgresql://USUARIO:CLAVE@ep-xxxx.region.aws.neon.tech/neondb?sslmode=require" \
+     npx prisma migrate dev --name init
    ```
-4. **Carga el contenido real** desde el admin. Si quieres datos de prueba en una base de staging, `npx prisma db seed` los crea, pero recuerda que borra todo (ver arriba).
+4. **Cargá el contenido real** desde el admin. Si querés datos de prueba en una base de staging, el seed los crea, pero **borra todo** (ver arriba). Mismo patrón, con la URL directa:
+   ```bash
+   DATABASE_URL="postgresql://USUARIO:CLAVE@ep-xxxx.region.aws.neon.tech/neondb?sslmode=require" \
+     npx prisma db seed
+   ```
 5. **Variables de entorno en Vercel** (Project Settings → Environment Variables), las 4, con valores fuertes y propios, distintos de los de `.env.example`:
-   `DATABASE_URL` (la de Neon), `ADMIN_PASSWORD`, `SESSION_SECRET` (32 o más caracteres) y `NEXT_PUBLIC_WHATSAPP_NUMBER`.
-6. **Build**: el comando por defecto de Vercel (`next build`) alcanza. El script `postinstall` ya corre `prisma generate` al instalar dependencias. Las migraciones nuevas se aplican con `npx prisma migrate deploy` contra la base de producción (desde tu equipo con `DATABASE_URL` apuntando a Neon, o anteponiéndolo al comando de build: `prisma migrate deploy && next build`).
+   `DATABASE_URL` (la **con pooler** de Neon), `ADMIN_PASSWORD`, `SESSION_SECRET` (32 o más caracteres) y `NEXT_PUBLIC_WHATSAPP_NUMBER`.
+6. **Build**: el comando por defecto de Vercel (`next build`) alcanza. El script `postinstall` ya corre `prisma generate` al instalar dependencias. No pongas `prisma migrate deploy` en el build con la variable `DATABASE_URL` del proyecto, porque es la del pooler. Las migraciones nuevas se aplican desde tu equipo con la URL directa:
+   ```bash
+   DATABASE_URL="postgresql://...(directa)..." npx prisma migrate deploy
+   ```
+   Si preferís hacerlo en el build, definí una variable aparte con la URL directa (por ejemplo `DIRECT_DATABASE_URL`) y usá `DATABASE_URL="$DIRECT_DATABASE_URL" prisma migrate deploy && next build` como comando de build.
 
 ## Avisos de npm
 

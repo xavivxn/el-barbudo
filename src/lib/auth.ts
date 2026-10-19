@@ -13,6 +13,10 @@ export const PLACEHOLDER_SESSION_SECRET = "cambiar-por-un-secreto-de-al-menos-32
 
 const isProduction = () => process.env.NODE_ENV === "production";
 
+/** Ignora espacios y comillas que quedan al pegar el valor desde `.env.example` en el panel del hosting. */
+const isPlaceholder = (value: string, placeholder: string) =>
+  value.trim().replace(/^["']+|["']+$/g, "").trim() === placeholder;
+
 const sha256 = (value: string) => createHash("sha256").update(value).digest();
 
 /**
@@ -26,7 +30,7 @@ export function verifyPassword(
   expected: string | undefined = process.env.ADMIN_PASSWORD,
 ): boolean {
   if (!input || !expected) return false;
-  if (isProduction() && expected === PLACEHOLDER_ADMIN_PASSWORD) {
+  if (isProduction() && isPlaceholder(expected, PLACEHOLDER_ADMIN_PASSWORD)) {
     console.error(
       "ADMIN_PASSWORD tiene el valor de ejemplo de .env.example: el acceso al admin queda bloqueado hasta definir una contraseña propia.",
     );
@@ -40,7 +44,7 @@ function sessionOptions(): SessionOptions {
   if (!password || password.length < 32) {
     throw new Error("SESSION_SECRET debe estar definida y tener al menos 32 caracteres.");
   }
-  if (isProduction() && password === PLACEHOLDER_SESSION_SECRET) {
+  if (isProduction() && isPlaceholder(password, PLACEHOLDER_SESSION_SECRET)) {
     throw new Error(
       "SESSION_SECRET tiene el valor de ejemplo de .env.example. Defínela con un secreto propio y único antes de usar el admin en producción.",
     );
