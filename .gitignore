@@ -5,3 +5,16 @@ node_modules/
 *.db
 *.db-journal
 .DS_Store
+
+# next / tooling
+/out/
+/build
+*.pem
+*.tsbuildinfo
+next-env.d.ts
+/coverage
+npm-debug.log*
+
+# env files (keep the example)
+.env.*
+!.env.example

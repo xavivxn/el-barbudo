@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #f7f5f0;
+  --surface: #ffffff;
+  --fg: #141414;
+  --muted: #6b6762;
+  --line: #e6e2da;
+  --accent: #9a7b4f;
+  --ok: #3f6b52;
+  --whatsapp: #25d366;
+}
+
+.dark {
+  --bg: #121212;
+  --surface: #1c1c1c;
+  --fg: #f2efe9;
+  --muted: #a39e95;
+  --line: #2e2c29;
+  --accent: #c9a66b;
+  --ok: #7fa68f;
+  --whatsapp: #25d366;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-ok: var(--ok);
+  --color-whatsapp: var(--whatsapp);
+  --font-serif: var(--font-cormorant), Georgia, serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
