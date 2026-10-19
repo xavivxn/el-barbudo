@@ -149,8 +149,14 @@ describe("CategoryTabs", () => {
     const panels = [...doc.querySelectorAll('[role="tabpanel"]')];
     expect(panels).toHaveLength(3);
     expect(panels.map((panel) => panel.hasAttribute("hidden"))).toEqual([false, true, true]);
-    // El panel activo trae sus tarjetas y ninguna parte de opacidad 0 (invisible sin JS).
-    expect(panels[0].querySelectorAll("li")).toHaveLength(2);
+    // Todos los paneles traen sus tarjetas (enlaces para quien no corre JS y para buscadores);
+    // ninguna parte de opacidad 0 (invisible sin JS).
+    expect(panels.map((panel) => panel.querySelectorAll("li").length)).toEqual([2, 1, 2]);
+    expect(panels.map((panel) => [...panel.querySelectorAll("h3 a")].map((link) => link.getAttribute("href")))).toEqual([
+      ["/productos/noche-de-cuero", "/productos/bleu"],
+      ["/productos/aceite-de-barba"],
+      ["/productos/cabello-0", "/productos/cabello-1"],
+    ]);
     expect(html).not.toMatch(/opacity:\s*0\s*[;"]/);
 
     const seeAll = [...doc.querySelectorAll("a")].filter((link) => link.textContent?.startsWith("Ver todos"));

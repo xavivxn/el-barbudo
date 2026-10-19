@@ -3,15 +3,17 @@
 import { ArrowRight } from "lucide-react";
 import { AnimatePresence, motion, type Transition, type Variants } from "motion/react";
 import Link from "next/link";
-import { type KeyboardEvent, useId, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { ProductCard } from "@/components/shop/ProductCard";
-import { PRODUCT_GRID_CLASS } from "@/components/shop/ProductGrid";
+import { PRODUCT_GRID_CLASS, ProductGrid } from "@/components/shop/ProductGrid";
 import type { CategoryGroup } from "@/lib/home";
 
 const EASE_OUT: Transition = { duration: 0.25, ease: "easeOut" };
 const STAGGER_S = 0.04;
 /** Tope de la cascada: con la entrada de 250 ms, toda la animación termina dentro de 400 ms. */
 const STAGGER_TOTAL_S = 0.15;
+/** Red de seguridad: si `onAnimationComplete` no llega (animación cortada), el alto retenido se suelta igual. */
+const HOLD_SAFETY_MS = 600;
 
 const cardVariants: Variants = {
   hidden: { opacity: 0, y: 8 },
@@ -42,6 +44,7 @@ function Tabs({ groups }: CategoryTabsProps) {
   const panelsRef = useRef<HTMLDivElement>(null);
   // Alto del panel saliente, retenido hasta que termina la entrada: el contenido de abajo no salta mientras se anima.
   const [holdHeight, setHoldHeight] = useState<number | undefined>(undefined);
+  const holdTimer = useRef<number | undefined>(undefined);
   const [activeSlug, setActiveSlug] = useState(groups[0].category.slug);
   // Si el grupo activo desaparece de la lista, vuelve a la primera pestaña.
   const active = groups.find((group) => group.category.slug === activeSlug) ?? groups[0];
@@ -51,9 +54,20 @@ function Tabs({ groups }: CategoryTabsProps) {
   const tabId = (slug: string) => `${uid}-tab-${slug}`;
   const panelId = (slug: string) => `${uid}-panel-${slug}`;
 
+  useEffect(() => () => window.clearTimeout(holdTimer.current), []);
+
+  function releaseHold() {
+    window.clearTimeout(holdTimer.current);
+    setHoldHeight(undefined);
+  }
+
   function select(index: number, { focus = false } = {}) {
     const slug = groups[index].category.slug;
-    if (slug !== active.category.slug) setHoldHeight(panelsRef.current?.offsetHeight);
+    if (slug !== active.category.slug) {
+      setHoldHeight(panelsRef.current?.offsetHeight);
+      window.clearTimeout(holdTimer.current);
+      holdTimer.current = window.setTimeout(releaseHold, HOLD_SAFETY_MS);
+    }
     setActiveSlug(slug);
     if (focus) tabRefs.current[index]?.focus();
   }
@@ -146,8 +160,9 @@ function Tabs({ groups }: CategoryTabsProps) {
 
       {/*
         Un `tabpanel` persistente por categoría, todos en el HTML del servidor: los inactivos con `hidden`,
-        así sin JS se ve el de la primera y los demás existen. Las tarjetas solo se montan en el panel
-        activo y entran con una cascada; `initial={false}` evita que el primer render parta de opacidad 0.
+        así sin JS se ve el de la primera y los demás existen con sus tarjetas (enlaces para buscadores).
+        Solo el panel activo usa la grilla animada, que entra con una cascada; los ocultos llevan la grilla
+        estática. `initial={false}` evita que el primer render parta de opacidad 0.
       */}
       <div ref={panelsRef} style={{ minHeight: holdHeight }}>
         {groups.map(({ category, products }) => {
@@ -170,7 +185,7 @@ function Tabs({ groups }: CategoryTabsProps) {
                     variants={gridVariants(products.length)}
                     initial="hidden"
                     animate="show"
-                    onAnimationComplete={() => setHoldHeight(undefined)}
+                    onAnimationComplete={releaseHold}
                   >
                     {products.map((product) => (
                       <motion.li key={product.id} variants={cardVariants}>
@@ -180,6 +195,7 @@ function Tabs({ groups }: CategoryTabsProps) {
                   </motion.ul>
                 ) : null}
               </AnimatePresence>
+              {selected ? null : <ProductGrid products={products} headingLevel={3} />}
             </div>
           );
         })}
