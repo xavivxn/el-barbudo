@@ -17,6 +17,6 @@ export const site = {
       "Somos una barbería de barrio con una selección cuidada de perfumes. Cortes clásicos, barba a navaja y fragancias que duran todo el día.",
       "Atendemos con turno y también sin turno. Si no sabés cuál perfume elegir, te ayudamos a encontrar el tuyo.",
     ],
-    image: "/logo.jpg",
+    image: "https://images.unsplash.com/photo-1512690459411-b9245aed614b?w=1600&q=75",
   },
 };
