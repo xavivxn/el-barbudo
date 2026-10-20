@@ -6,10 +6,12 @@ import { cache } from "react";
 import { ProductGallery } from "@/components/shop/ProductGallery";
 import { ProductGrid } from "@/components/shop/ProductGrid";
 import { ProductPurchase } from "@/components/shop/ProductPurchase";
+import { ScentPyramid } from "@/components/shop/ScentPyramid";
 import { Chip } from "@/components/ui/Chip";
 import { buildCatalogHref } from "@/lib/catalog";
 import { getProductBySlug, listProducts, pickRelated } from "@/lib/products";
 import { isSoldOut } from "@/lib/stock";
+import { toneFor } from "@/lib/tone";
 import { CATEGORIES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -36,13 +38,6 @@ export default async function ProductPage(props: PageProps<"/productos/[slug]">)
   const related = pickRelated(product, await listProducts());
   const category = CATEGORIES.find((c) => c.value === product.category);
   const soldOut = isSoldOut(product.variants);
-  const notes = product.notes
-    ? [
-        { label: "Salida", value: product.notes.top },
-        { label: "Corazón", value: product.notes.heart },
-        { label: "Fondo", value: product.notes.base },
-      ]
-    : null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-20 md:px-8 md:pb-28 md:pt-12">
@@ -92,23 +87,8 @@ export default async function ProductPage(props: PageProps<"/productos/[slug]">)
             <p className="mt-10 max-w-prose whitespace-pre-line">{product.description}</p>
           ) : null}
 
-          {notes ? (
-            <section aria-labelledby="notas" className="mt-10">
-              <h2 id="notas" className={sectionHeading}>
-                Notas olfativas
-              </h2>
-              <dl className="border-b border-line">
-                {notes.map((row) => (
-                  <div
-                    key={row.label}
-                    className="grid grid-cols-[6.5rem_1fr] gap-4 border-t border-line py-3"
-                  >
-                    <dt className="text-muted">{row.label}</dt>
-                    <dd>{row.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
+          {product.notes ? (
+            <ScentPyramid notes={product.notes} glow={toneFor(product).glow} />
           ) : product.benefits.length > 0 ? (
             <section aria-labelledby="beneficios" className="mt-10">
               <h2 id="beneficios" className={sectionHeading}>
