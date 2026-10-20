@@ -1,4 +1,6 @@
-import type { CSSProperties, ReactNode } from "react";
+"use client";
+
+import { type CSSProperties, type ReactNode, ViewTransition } from "react";
 import { ProductCard } from "@/components/shop/ProductCard";
 import type { ProductDTO } from "@/lib/types";
 
@@ -22,9 +24,14 @@ export function ProductGrid({ products, empty, headingLevel }: ProductGridProps)
   return (
     <ul className={PRODUCT_GRID_CLASS}>
       {products.map((product, index) => (
-        <li key={product.id} className="card-in" style={{ "--i": index } as CSSProperties}>
-          <ProductCard product={product} headingLevel={headingLevel} />
-        </li>
+        // Al filtrar u ordenar (una navegación), la tarjeta que sigue en la grilla se desliza a su
+        // nueva posición: la instancia vieja y la nueva comparten nombre y React las empareja
+        // (ver `.tarjeta-move` en globals). Las que se van se funden; las nuevas entran.
+        <ViewTransition key={product.id} name={`tarjeta-${product.id}`} share="tarjeta-move">
+          <li className="card-in" style={{ "--i": index } as CSSProperties}>
+            <ProductCard product={product} headingLevel={headingLevel} />
+          </li>
+        </ViewTransition>
       ))}
     </ul>
   );

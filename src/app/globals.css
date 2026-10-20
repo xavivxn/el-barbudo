@@ -378,13 +378,24 @@ body {
 }
 
 /*
+ * Barajado de la grilla (ProductGrid): al filtrar u ordenar, cada tarjeta que sigue se desliza a
+ * su nueva posición con una curva suave; el crossfade del par es imperceptible porque es la misma
+ * tarjeta. Las que entran o salen usan el fundido por defecto.
+ */
+::view-transition-group(.tarjeta-move) {
+  animation-duration: 450ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/*
  * Una sola transición por navegación: mientras corre la View Transition (que ya hace su crossfade),
  * el fundido de entrada de la plantilla (`animate-page-in`) termina en el acto. Duración 0 y no
  * `animation: none`: con `none`, al terminar la transición la animación se crearía de nuevo y la
  * página parpadearía desde opacidad 0. Regla aparte: un navegador que no conoce
  * `:active-view-transition` solo descarta esta regla (y ahí tampoco hay View Transition).
  */
-:root:active-view-transition .animate-page-in {
+:root:active-view-transition .animate-page-in,
+:root:active-view-transition .card-in {
   animation-duration: 0s;
 }
 
