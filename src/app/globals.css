@@ -383,6 +383,15 @@ body {
   animation: menu-sheet-in 200ms ease-out;
 }
 
+/*
+ * Hoja de etiquetas del catálogo en móvil (TagsSheet). Sin JS el botón enlaza a `#etiquetas` y la
+ * hoja se muestra por :target (sin fondo oscurecido ni foco atrapado, pero usable); "Cerrar" vuelve
+ * a `#`. Con JS la abre showModal() y esta regla no interviene.
+ */
+.tags-sheet:target:not([open]) {
+  display: block;
+}
+
 /* Drawer del carrito: entra desde la derecha. Es una animación CSS para que la regla de reduced-motion la anule. */
 @keyframes cart-drawer-in {
   from {

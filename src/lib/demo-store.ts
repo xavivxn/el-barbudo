@@ -1,3 +1,4 @@
+import { DEFAULT_SORT, type SortKey, sortProducts } from "@/lib/catalog";
 import { products as catalog, services as catalogServices } from "@/lib/catalog-data";
 import { toProductDTO, toVariantSnapshot, uniqueSortedTags, type ProductRow } from "@/lib/products";
 import type { Category, ProductDTO, ServiceDTO, VariantSnapshot } from "@/lib/types";
@@ -48,16 +49,18 @@ export async function listProducts(
     tag?: string;
     featuredOnly?: boolean;
     includeInactive?: boolean;
+    orden?: SortKey;
   } = {},
 ): Promise<ProductDTO[]> {
-  const { category, tag, featuredOnly, includeInactive } = opts;
-  return allProducts().filter(
+  const { category, tag, featuredOnly, includeInactive, orden } = opts;
+  const products = allProducts().filter(
     (p) =>
       (includeInactive || p.active) &&
       (!category || p.category === category) &&
       (!featuredOnly || p.featured) &&
       (!tag || p.tags.includes(tag)),
   );
+  return sortProducts(products, orden ?? DEFAULT_SORT);
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductDTO | null> {

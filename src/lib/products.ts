@@ -1,3 +1,4 @@
+import { DEFAULT_SORT, type SortKey, sortProducts } from "@/lib/catalog";
 import { getPrisma } from "@/lib/db-lazy";
 import { DEMO_MODE } from "@/lib/demo";
 import {
@@ -144,6 +145,8 @@ export async function listProducts(
     tag?: string;
     featuredOnly?: boolean;
     includeInactive?: boolean;
+    /** Orden del catálogo; por defecto, destacados y luego más nuevos. */
+    orden?: SortKey;
   } = {},
 ): Promise<ProductDTO[]> {
   if (DEMO_MODE) return (await demo()).listProducts(opts);
@@ -159,7 +162,7 @@ export async function listProducts(
   });
   const products = rows.map(toProductDTO);
   const { tag } = opts;
-  return tag ? products.filter((p) => p.tags.includes(tag)) : products;
+  return sortProducts(tag ? products.filter((p) => p.tags.includes(tag)) : products, opts.orden ?? DEFAULT_SORT);
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductDTO | null> {
