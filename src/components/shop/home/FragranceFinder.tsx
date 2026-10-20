@@ -226,7 +226,7 @@ function Finder({ perfumes }: FragranceFinderProps) {
         id={railId}
         aria-label="Perfumes sugeridos"
         onScroll={updateEdges}
-        className="relative -mx-4 mt-4 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto overscroll-x-contain px-4 pb-2 md:-mx-10 md:mt-6 md:scroll-px-10 md:px-10"
+        className="relative -mx-4 mt-2 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto overscroll-x-contain px-4 pb-2 pt-2 md:-mx-10 md:mt-4 md:scroll-px-10 md:px-10"
       >
         {results.map((product, index) => (
           <motion.li

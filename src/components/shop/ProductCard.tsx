@@ -1,7 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { focusRing } from "@/components/ui/focus";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
+import { usePointerVars } from "@/lib/hooks/usePointerVars";
 import { cardPricing } from "@/lib/pricing";
 import type { ProductDTO } from "@/lib/types";
 
@@ -19,10 +22,14 @@ type ProductCardProps = {
 export function ProductCard({ product, headingLevel = 3, sizes = GRID_SIZES }: ProductCardProps) {
   const Heading = headingLevel === 2 ? "h2" : "h3";
   const href = `/productos/${product.slug}`;
+  const { onPointerMove } = usePointerVars<HTMLElement>();
   const { soldOut, label: price, orderHref, orderVariant: cheapest } = cardPricing(product);
 
   return (
-    <article className="group flex h-full flex-col transition-transform duration-200 hover:-translate-y-0.5">
+    <article
+      onPointerMove={onPointerMove}
+      className="card-spotlight group relative isolate flex h-full flex-col transition-transform duration-200 hover:-translate-y-0.5"
+    >
       <div className="relative">
         {/* Duplica el enlace del nombre: fuera del orden de tabulación y del árbol accesible. */}
         <Link

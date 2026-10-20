@@ -159,6 +159,77 @@ body {
   animation: showcase-breathe 6s ease-in-out infinite;
 }
 
+/*
+ * Tarjetas de producto con luz que sigue al mouse (inspirada en las cards de Ardentium). El panel
+ * iluminado se extiende --spot-out por fuera de la tarjeta: la foto y el texto quedan enmarcados con
+ * aire y no se mueve nada (los pseudo-elementos son absolutos). ::before es el foco bronce
+ * (--mx/--my los escribe usePointerVars) y ::after, un borde de 1px que brilla cerca del puntero.
+ * Los dos van detrás del contenido (z -1 dentro del `isolate`) y se ven solo con hover de mouse; en
+ * touch no hay hover real, así que no cambia nada. Contraste: el foco más intenso (alfa compuesta
+ * ~16% en claro y ~18% en oscuro, sobre un fondo de superficie al 70%) deja text-muted en ≥4.5:1.
+ */
+.card-spotlight {
+  --spot-out: 6px;
+  --spot-a: 12%;
+  --spot-core: 5%;
+}
+
+.dark .card-spotlight {
+  --spot-a: 14%;
+}
+
+.card-spotlight::before,
+.card-spotlight::after {
+  content: "";
+  position: absolute;
+  inset: calc(var(--spot-out) * -1);
+  z-index: -1;
+  border-radius: 1.25rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 350ms ease-out;
+}
+
+.card-spotlight::before {
+  --sx: calc(var(--mx, 50%) + var(--spot-out));
+  --sy: calc(var(--my, 50%) + var(--spot-out));
+  background:
+    radial-gradient(
+      140px circle at var(--sx) var(--sy),
+      color-mix(in oklab, var(--accent) var(--spot-core), transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      360px circle at var(--sx) var(--sy),
+      color-mix(in oklab, var(--accent) var(--spot-a), transparent),
+      transparent 45%
+    ),
+    color-mix(in oklab, var(--surface) 70%, transparent);
+}
+
+.card-spotlight::after {
+  --sx: calc(var(--mx, 50%) + var(--spot-out));
+  --sy: calc(var(--my, 50%) + var(--spot-out));
+  padding: 1px;
+  background: radial-gradient(
+    300px circle at var(--sx) var(--sy),
+    color-mix(in oklab, var(--accent) 90%, transparent),
+    transparent 40%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card-spotlight:hover::before,
+  .card-spotlight:hover::after {
+    opacity: 1;
+  }
+}
+
 @keyframes menu-sheet-in {
   from {
     opacity: 0;
