@@ -229,7 +229,10 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
         id={trackId}
         onScroll={onTrackScroll}
         aria-live={playing ? "off" : "polite"}
-        className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        // En desktop la pista recorta en vertical (overflow-x crea un contenedor de scroll) y el
+        // resplandor de la foto se pasaba por abajo: `md:pb-16` le da aire, y la fila de controles
+        // sube lo mismo (`md:-mt-16`) para que el alto total no cambie.
+        className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] md:pb-16 [&::-webkit-scrollbar]:hidden"
       >
         {products.map((product, index) => (
           <Slide
@@ -250,7 +253,7 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
       </div>
 
       {count > 1 ? (
-        <div className="flex items-center gap-3 px-4 pb-3 md:px-12 md:pb-5">
+        <div className="relative z-10 flex items-center gap-3 px-4 pb-3 md:-mt-16 md:px-12 md:pb-5">
           <div className="flex flex-1 items-center gap-2">
             {products.map((product, index) => {
               const current = index === active;
