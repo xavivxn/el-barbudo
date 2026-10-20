@@ -46,6 +46,16 @@ export const MIST_CAP_DESKTOP = 48;
 export const MIST_WIDE_PX = 480;
 /** Paso máximo en segundos: al volver de una pestaña en segundo plano no hay saltos. */
 export const MAX_DT = 0.05;
+/** Cadencia de dibujo: ~30 cuadros por segundo alcanzan para una niebla lenta y difusa. */
+export const MIST_FRAME_MS = 1000 / 30;
+/** Margen para que a 60/90/120 Hz se dibuje justo un cuadro de cada 2/3/4 (el reloj de rAF oscila). */
+const FRAME_SLACK = 0.9;
+
+/** ¿Toca dibujar en este cuadro de rAF? `last` es el instante del último dibujado (`null`: ninguno). */
+export function frameDue(now: number, last: number | null) {
+  return last === null || now - last >= MIST_FRAME_MS * FRAME_SLACK;
+}
+
 /** Vida media aproximada: con ella la emisión mantiene la bruma cerca del tope sin pasarlo. */
 const MEAN_LIFE = 6;
 /** Proporción de motas entre las partículas nuevas. */

@@ -1,13 +1,15 @@
 "use client";
 
 import { useInView } from "motion/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDocumentHidden } from "@/lib/hooks/useDocumentHidden";
 import { usePrefersReducedMotion } from "@/lib/hooks/usePrefersReducedMotion";
-import { type Bounds, createMist, type Mist, opacityOf, parseColor, tick } from "@/lib/mist";
+import { type Bounds, createMist, frameDue, type Mist, opacityOf, parseColor, tick } from "@/lib/mist";
 
-/** Tope de densidad de píxeles: más no se nota en una niebla difusa y cuesta el doble. */
-const MAX_DPR = 2;
+/** Tope de densidad de píxeles: en una niebla difusa no se nota la diferencia y cuesta 4 veces menos. */
+const MAX_DPR = 1;
+/** Al cambiar de destacado la bruma saliente se funde en este tiempo y recién después se desmonta. */
+export const MIST_FADE_MS = 400;
 /** Lado del sprite de la voluta (se escala al dibujar). */
 const SPRITE_PX = 64;
 /** Bronce de la marca: por si `--glow` no se puede leer. */
@@ -22,29 +24,45 @@ const LIGHT_ALPHA = { wisp: 0.9, mote: 0.5 } as const;
  * Cuánto se aclara el tono hacia el blanco: el halo ya es de ese color, y la bruma del mismo tono
  * puro se perdería sobre él. Un tinte más pálido se lee como vapor del perfume.
  */
-const PALE = { dark: 0.3, light: 0.55 } as const;
+const PALE = { dark: 0.3, light: 0.45 } as const;
 
 type Engine = { mist: Mist; bounds: Bounds; draw: () => void };
+
+type FragranceMistProps = {
+  /** Diapositiva activa. Al dejar de serlo, el canvas se funde y se desmonta (no se corta en seco). */
+  active: boolean;
+};
 
 /**
  * Bruma de fragancia de la vitrina: volutas y motas del color del perfume (`--glow` del área de la
  * foto) que suben desde el frasco. Decorativa (`aria-hidden`). Con reduced motion no se monta; solo
- * anima en pantalla y con la pestaña visible. La monta solo la diapositiva activa.
+ * anima en la diapositiva activa, en pantalla y con la pestaña visible, así que nunca corre más de un
+ * bucle a la vez. La saliente queda quieta mientras se funde (`MIST_FADE_MS`) y luego se desmonta.
  */
-export function FragranceMist() {
+export function FragranceMist({ active }: FragranceMistProps) {
   const reducedMotion = usePrefersReducedMotion();
-  if (reducedMotion) return null;
-  return <MistCanvas />;
+  // Montada mientras es la activa y durante el fundido de salida.
+  const [mounted, setMounted] = useState(active);
+  if (active && !mounted) setMounted(true);
+
+  useEffect(() => {
+    if (active || !mounted) return;
+    const id = window.setTimeout(() => setMounted(false), MIST_FADE_MS);
+    return () => window.clearTimeout(id);
+  }, [active, mounted]);
+
+  if (reducedMotion || !mounted) return null;
+  return <MistCanvas active={active} />;
 }
 
-function MistCanvas() {
+function MistCanvas({ active }: FragranceMistProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const inView = useInView(canvasRef);
   const hidden = useDocumentHidden();
-  const running = inView && !hidden;
+  const running = active && inView && !hidden;
 
-  // Contexto, tamaño (ResizeObserver, DPR ≤ 2), color del tono y modo claro/oscuro.
+  // Contexto, tamaño (ResizeObserver, DPR ≤ 1), color del tono y modo claro/oscuro.
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
@@ -136,24 +154,35 @@ function MistCanvas() {
     };
   }, []);
 
-  // El bucle corre solo en pantalla y con la pestaña visible; al volver, `tick` acota el dt.
+  // El bucle corre solo en la activa, en pantalla y con la pestaña visible; al volver, `tick` acota
+  // el dt. Dibuja a ~30 cuadros por segundo (`frameDue`): la niebla es lenta y no lo nota.
   useEffect(() => {
     const engine = engineRef.current;
     if (!running || !engine) return;
     let id = 0;
     let last: number | null = null;
     const frame = (now: number) => {
+      id = requestAnimationFrame(frame);
+      if (!frameDue(now, last)) return;
       const dt = last === null ? 0 : (now - last) / 1000;
       last = now;
       if (engine.bounds.width > 0 && engine.bounds.height > 0) {
         tick(engine.mist, dt, engine.bounds);
         engine.draw();
       }
-      id = requestAnimationFrame(frame);
     };
     id = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(id);
   }, [running]);
 
-  return <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 h-full w-full" />;
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden="true"
+      data-leaving={active ? undefined : ""}
+      className={`absolute inset-0 h-full w-full transition-opacity duration-400 ease-out ${
+        active ? "opacity-100" : "opacity-0"
+      }`}
+    />
+  );
 }

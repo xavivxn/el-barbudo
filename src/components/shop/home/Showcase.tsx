@@ -205,7 +205,9 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
       onBlur={onBlur}
       onPointerEnter={(event) => event.pointerType === "mouse" && setHovered(true)}
       onPointerLeave={(event) => event.pointerType === "mouse" && setHovered(false)}
-      className="relative isolate overflow-hidden rounded-2xl border border-line bg-surface md:rounded-3xl"
+      // `overflow-clip` y no `overflow-hidden`: recorta igual (esquinas incluidas) pero no es una caja
+      // desplazable, así un `scrollIntoView` o un foco no la corren de lado.
+      className="relative isolate overflow-clip rounded-2xl border border-line bg-surface md:rounded-3xl"
     >
       {/*
         Control de rotación: primero en el orden de foco y de lectura (patrón WAI-ARIA). Va arriba a
@@ -240,6 +242,7 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
             count={count}
             active={index === active}
             inert={hydrated && index !== active}
+            live={inView && !hidden}
             parallaxY={reducedMotion ? undefined : parallaxY}
             reducedMotion={reducedMotion}
           />
@@ -296,6 +299,8 @@ type SlideProps = {
   count: number;
   active: boolean;
   inert: boolean;
+  /** La vitrina está en pantalla y la pestaña visible: el borde de luz de la activa gira. */
+  live: boolean;
   parallaxY: MotionValue<number> | undefined;
   reducedMotion: boolean;
 };
@@ -304,7 +309,7 @@ type SlideProps = {
 const TILT_X = 8;
 const TILT_Y = 10;
 
-function Slide({ ref, product, index, count, active, inert, parallaxY, reducedMotion }: SlideProps) {
+function Slide({ ref, product, index, count, active, inert, live, parallaxY, reducedMotion }: SlideProps) {
   const { soldOut, label: price, orderHref } = cardPricing(product);
   const { glow } = toneFor(product);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -344,7 +349,8 @@ function Slide({ ref, product, index, count, active, inert, parallaxY, reducedMo
       aria-label={`${index + 1} de ${count}`}
       inert={inert}
       tabIndex={-1}
-      className="grid min-h-[70svh] w-full shrink-0 snap-center grid-rows-[auto_1fr] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:h-[520px] md:min-h-0 md:grid-cols-2 md:grid-rows-1"
+      // `relative`: los `sr-only` (absolutos) de la diapositiva quedan dentro de ella y no estiran el riel.
+      className="relative grid min-h-[70svh] w-full shrink-0 snap-center grid-rows-[auto_1fr] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:h-[520px] md:min-h-0 md:grid-cols-2 md:grid-rows-1"
     >
       <div className="@container flex min-w-0 flex-col px-4 pt-4 pb-5 md:justify-center md:py-10 md:pr-6 md:pl-12 lg:pl-16">
         <p className="text-xs font-medium tracking-[0.2em] text-muted uppercase">
@@ -446,9 +452,10 @@ function Slide({ ref, product, index, count, active, inert, parallaxY, reducedMo
           </div>
           {/*
             Bruma de fragancia: delante del halo, detrás del marco y bajo la misma máscara, así que nunca
-            llega al texto. Un solo canvas, el de la activa (se monta de nuevo con el tono del destacado).
+            llega al texto. Anima solo la de la activa (se monta de nuevo con el tono del destacado); la
+            saliente se funde antes de desmontarse.
           */}
-          {active ? <FragranceMist /> : null}
+          <FragranceMist active={active} />
         </div>
 
         <motion.div style={parallaxY ? { y: parallaxY } : undefined} className="relative h-[86%] md:h-[340px] lg:h-[420px]">
@@ -457,6 +464,8 @@ function Slide({ ref, product, index, count, active, inert, parallaxY, reducedMo
             <ViewTransition key={morph.generation} name={morph.name} share="morph" default="none">
               <div
                 ref={frameRef}
+                // El borde de luz (`showcase-rim`) gira solo en la activa y se pausa fuera de la pantalla.
+                data-rim={active ? (live ? "on" : "paused") : undefined}
                 style={{ transform: "rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))" }}
                 className={`group/frame showcase-rim relative aspect-4/5 h-full overflow-hidden rounded-2xl bg-surface shadow-[0_24px_48px_-24px_rgb(20_20_20/0.45),0_0_90px_-8px_var(--glow)] transition-[transform,rotate,scale,box-shadow] duration-400 ease-out ${
                   active ? "-rotate-3 scale-100" : "rotate-0 scale-[0.92]"

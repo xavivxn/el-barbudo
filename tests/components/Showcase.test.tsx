@@ -246,15 +246,42 @@ describe("Showcase", () => {
   });
 
   it("la bruma de fragancia es un solo canvas, en la diapositiva activa, y se muda con ella", async () => {
-    const user = userEvent.setup();
+    useFakeTimersWithUserEvent();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const { container } = render(<Showcase products={[p1, p2, p3]} />);
     expect(container.querySelectorAll("canvas")).toHaveLength(1);
     expect(activeSlide()).toContainElement(container.querySelector("canvas"));
 
     await user.click(screen.getByRole("button", { name: "Destacado siguiente" }));
-    expect(container.querySelectorAll("canvas")).toHaveLength(1);
     expect(activeSlide()).toHaveAccessibleName("2 de 3");
+    // La saliente no se corta: se funde (~400 ms) y recién después se desmonta.
+    const leaving = screen.getByRole("group", { name: "1 de 3" }).querySelector("canvas");
+    expect(leaving).toHaveAttribute("data-leaving");
+    expect(activeSlide()?.querySelector("canvas")).not.toHaveAttribute("data-leaving");
+
+    act(() => vi.advanceTimersByTime(400));
+    expect(container.querySelectorAll("canvas")).toHaveLength(1);
     expect(activeSlide()).toContainElement(container.querySelector("canvas"));
+  });
+
+  it("el carrusel recorta sin ser una caja desplazable y cada diapositiva contiene sus absolutos", () => {
+    render(<Showcase products={[p1, p2, p3]} />);
+    const region = screen.getByRole("region", { name: /destacados/i });
+    // `overflow-clip` recorta igual (con las esquinas redondeadas) pero no se puede desplazar por código.
+    expect(region).toHaveClass("overflow-clip", "rounded-2xl");
+    expect(region).not.toHaveClass("overflow-hidden");
+    // Los `sr-only` (absolutos) de cada diapositiva quedan dentro de ella, no del riel.
+    for (const slide of within(region).getAllByRole("group")) expect(slide).toHaveClass("relative");
+  });
+
+  it("el borde de luz gira solo en la activa y se pausa fuera de la pantalla", () => {
+    const { container, rerender } = render(<Showcase products={[p1, p2, p3]} />);
+    const frames = () => Array.from(container.querySelectorAll<HTMLElement>(".showcase-rim"));
+    expect(frames().map((frame) => frame.dataset.rim)).toEqual(["on", undefined, undefined]);
+
+    viewport.inView = false;
+    rerender(<Showcase products={[p1, p2, p3]} />);
+    expect(frames().map((frame) => frame.dataset.rim)).toEqual(["paused", undefined, undefined]);
   });
 
   it("con reduced motion no hay bruma", () => {

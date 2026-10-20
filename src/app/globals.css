@@ -148,7 +148,18 @@ body {
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
+}
+
+/*
+ * El giro anima una propiedad registrada (--rim): se repinta en el hilo principal en cada cuadro, así
+ * que corre solo en la diapositiva activa (data-rim) y se pausa con la vitrina fuera de la pantalla.
+ */
+.showcase-rim[data-rim]::before {
   animation: showcase-rim 6s linear infinite;
+}
+
+.showcase-rim[data-rim="paused"]::before {
+  animation-play-state: paused;
 }
 
 .showcase-float {
@@ -253,6 +264,17 @@ body {
 
 ::view-transition-group(root) {
   animation-duration: 180ms;
+}
+
+/*
+ * Una sola transición por navegación: mientras corre la View Transition (que ya hace su crossfade),
+ * el fundido de entrada de la plantilla (`animate-page-in`) termina en el acto. Duración 0 y no
+ * `animation: none`: con `none`, al terminar la transición la animación se crearía de nuevo y la
+ * página parpadearía desde opacidad 0. Regla aparte: un navegador que no conoce
+ * `:active-view-transition` solo descarta esta regla (y ahí tampoco hay View Transition).
+ */
+:root:active-view-transition .animate-page-in {
+  animation-duration: 0s;
 }
 
 /* Los clics durante la transición llegan a la página (la capa de la transición no los atrapa). */

@@ -3,10 +3,12 @@ import {
   capFor,
   clampDt,
   createMist,
+  frameDue,
   isAlive,
   MAX_DT,
   MIST_CAP_DESKTOP,
   MIST_CAP_MOBILE,
+  MIST_FRAME_MS,
   opacityOf,
   parseColor,
   spawn,
@@ -169,5 +171,23 @@ describe("parseColor", () => {
   it("cae en null si no entiende el color", () => {
     expect(parseColor("")).toBeNull();
     expect(parseColor("var(--glow-light)")).toBeNull();
+  });
+});
+
+describe("frameDue (~30 cuadros por segundo)", () => {
+  it("el primer cuadro siempre dibuja", () => {
+    expect(frameDue(0, null)).toBe(true);
+  });
+
+  it("a 60 Hz dibuja uno de cada dos cuadros; a 120 Hz, uno de cada cuatro", () => {
+    expect(frameDue(1000 / 60, 0)).toBe(false);
+    expect(frameDue(2000 / 60, 0)).toBe(true);
+    expect(frameDue(3000 / 120, 0)).toBe(false);
+    expect(frameDue(4000 / 120, 0)).toBe(true);
+  });
+
+  it("la cadencia es de 30 cuadros por segundo", () => {
+    expect(MIST_FRAME_MS).toBeCloseTo(1000 / 30);
+    expect(frameDue(MIST_FRAME_MS, 0)).toBe(true);
   });
 });
