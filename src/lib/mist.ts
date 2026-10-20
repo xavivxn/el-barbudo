@@ -40,8 +40,8 @@ export type Mist = {
   carry: number;
 };
 
-export const MIST_CAP_MOBILE = 24;
-export const MIST_CAP_DESKTOP = 48;
+export const MIST_CAP_MOBILE = 32;
+export const MIST_CAP_DESKTOP = 64;
 /** Ancho del contenedor desde el que se usa el tope de escritorio. */
 export const MIST_WIDE_PX = 480;
 /** Paso máximo en segundos: al volver de una pestaña en segundo plano no hay saltos. */
@@ -59,7 +59,7 @@ export function frameDue(now: number, last: number | null) {
 /** Vida media aproximada: con ella la emisión mantiene la bruma cerca del tope sin pasarlo. */
 const MEAN_LIFE = 6;
 /** Proporción de motas entre las partículas nuevas. */
-const MOTE_SHARE = 0.2;
+const MOTE_SHARE = 0.35;
 
 export function capFor(width: number) {
   return width >= MIST_WIDE_PX ? MIST_CAP_DESKTOP : MIST_CAP_MOBILE;
@@ -88,7 +88,7 @@ export function spawn(mist: Mist, { width, height }: Bounds): MistParticle | nul
   const u = rng() * 2 - 1;
   const side = Math.sign(u) * Math.abs(u) ** 0.5;
   const x = width / 2 + side * spread;
-  const r0 = mote ? between(rng, 1.1, 2.2) : size * between(rng, 0.05, 0.09);
+  const r0 = mote ? between(rng, 1.6, 3.2) : size * between(rng, 0.05, 0.09);
   const particle: MistParticle = {
     kind: mote ? "mote" : "wisp",
     x,
@@ -102,7 +102,7 @@ export function spawn(mist: Mist, { width, height }: Bounds): MistParticle | nul
     grow: mote ? 0 : between(rng, 1.2, 2),
     age: 0,
     life: mote ? between(rng, 4, 7) : between(rng, 5, 8),
-    alpha: mote ? between(rng, 0.35, 0.6) : between(rng, 0.08, 0.16),
+    alpha: mote ? between(rng, 0.6, 0.95) : between(rng, 0.14, 0.26),
     phase: rng() * Math.PI * 2,
     swayAmp: mote ? between(rng, 4, 10) : between(rng, 6, 16),
     swayFreq: mote ? between(rng, 0.8, 1.6) : between(rng, 0.4, 0.9),

@@ -32,11 +32,11 @@ const desktop = { width: 640, height: 520 };
 const mobile = { width: 375, height: 300 };
 
 describe("capFor", () => {
-  it("24 partículas en un contenedor angosto y 48 en uno ancho", () => {
+  it("32 partículas en un contenedor angosto y 64 en uno ancho", () => {
     expect(capFor(375)).toBe(MIST_CAP_MOBILE);
     expect(capFor(640)).toBe(MIST_CAP_DESKTOP);
-    expect(MIST_CAP_MOBILE).toBe(24);
-    expect(MIST_CAP_DESKTOP).toBe(48);
+    expect(MIST_CAP_MOBILE).toBe(32);
+    expect(MIST_CAP_DESKTOP).toBe(64);
   });
 });
 

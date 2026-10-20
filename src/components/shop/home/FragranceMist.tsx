@@ -15,16 +15,18 @@ const SPRITE_PX = 64;
 /** Bronce de la marca: por si `--glow` no se puede leer. */
 const FALLBACK_RGB: [number, number, number] = [201, 166, 107];
 /**
- * En claro no se suma luz (`lighter` sobre papel no se ve): se pinta normal, con un tinte más pálido
- * que el halo y algo más tenue, así la bruma queda como un velo claro sobre el color y nunca como
- * manchas oscuras. Las motas, aún más suaves.
+ * En claro no se suma luz (`lighter` sobre papel no se ve): se pinta normal. Las volutas quedan un
+ * poco por debajo del alfa base para que sean velo y no mancha; las motas, completas, son las que
+ * marcan la presencia del perfume.
  */
-const LIGHT_ALPHA = { wisp: 0.9, mote: 0.5 } as const;
+const LIGHT_ALPHA = { wisp: 0.85, mote: 1 } as const;
 /**
- * Cuánto se aclara el tono hacia el blanco: el halo ya es de ese color, y la bruma del mismo tono
- * puro se perdería sobre él. Un tinte más pálido se lee como vapor del perfume.
+ * Corrimiento del tono por modo. En oscuro se aclara hacia el blanco (positivo): sobre carbón y con
+ * `lighter`, se lee como vapor luminoso. En claro se oscurece un poco hacia el negro (negativo): un
+ * tinte más pálido que el halo se perdía sobre el papel, uno algo más hondo contrasta con el halo
+ * del mismo color sin volverse sucio.
  */
-const PALE = { dark: 0.3, light: 0.45 } as const;
+const SHIFT = { dark: 0.65, light: -0.22 } as const;
 
 type Engine = { mist: Mist; bounds: Bounds; draw: () => void };
 
@@ -95,8 +97,11 @@ function MistCanvas({ active }: FragranceMistProps) {
         ctx.fillStyle = raw.trim();
         rgb = parseColor(String(ctx.fillStyle));
       }
-      const pale = dark ? PALE.dark : PALE.light;
-      const [r, g, b] = (rgb ?? FALLBACK_RGB).map((c) => Math.round(c + (255 - c) * pale));
+      const shift = dark ? SHIFT.dark : SHIFT.light;
+      // Positivo: hacia el blanco. Negativo: hacia el negro.
+      const [r, g, b] = (rgb ?? FALLBACK_RGB).map((c) =>
+        Math.round(shift >= 0 ? c + (255 - c) * shift : c * (1 + shift)),
+      );
       const sctx = sprite.getContext("2d");
       if (!sctx) return;
       const half = SPRITE_PX / 2;
