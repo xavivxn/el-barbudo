@@ -21,16 +21,13 @@ describe("toneFor", () => {
     expect(toneFor({ tags: ["día", "suave"] }).key).toBe("bronce");
   });
 
-  it("usa los colores exactos (claros más saturados para que el brillo se vea sobre la superficie blanca)", () => {
-    const colors = (tag: string) => {
-      const { light, dark } = toneFor({ tags: [tag] });
-      return [light, dark];
-    };
-    expect(colors("fresco")).toEqual(["#A9C3DC", "#1F3A52"]);
-    expect(colors("amaderado")).toEqual(["#CDB291", "#3A2A1E"]);
-    expect(colors("dulce")).toEqual(["#E6BE7E", "#47331A"]);
-    expect(colors("especiado")).toEqual(["#DBA88E", "#4A2519"]);
-    expect(colors("natural")).toEqual(["#B8C79F", "#28331F"]);
-    expect(toneFor({ tags: [] })).toEqual({ key: "bronce", light: "#D6BB8E", dark: "#33291E" });
+  it("da una luz saturada por modo para el aura de la foto", () => {
+    const glow = (tag: string) => toneFor({ tags: [tag] }).glow;
+    expect(glow("fresco")).toEqual({ light: "#6F9FD3", dark: "#4A8BD0" });
+    expect(glow("amaderado")).toEqual({ light: "#B9864F", dark: "#B07A44" });
+    expect(glow("dulce")).toEqual({ light: "#E2A23E", dark: "#D9982F" });
+    expect(glow("especiado")).toEqual({ light: "#D4764F", dark: "#C9603A" });
+    expect(glow("natural")).toEqual({ light: "#8EAE5E", dark: "#7C9C4C" });
+    expect(toneFor({ tags: [] })).toEqual({ key: "bronce", glow: { light: "#C9A66B", dark: "#C9A66B" } });
   });
 });

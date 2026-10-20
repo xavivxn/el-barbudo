@@ -3,23 +3,20 @@ import type { ProductDTO } from "@/lib/types";
 export type Tone = {
   key: "fresco" | "amaderado" | "dulce" | "especiado" | "natural" | "bronce";
   /**
-   * Color del brillo radial en modo claro. Es seguro solo porque el brillo nunca queda detrás del
-   * texto (Ruling R3: va detrás de la foto y se apaga antes del área de texto). Sobre estos tonos,
-   * `text-fg` (#141414) llega a 8.8–10.6:1, pero `text-muted` (#6B6762) solo a 2.7–3.2:1: si algún
-   * día el texto pasa por encima, hay que aclararlos de nuevo.
+   * Luz saturada del aura que rodea la foto de la vitrina (halo, borde de luz y sombra de color),
+   * por modo. Es segura solo porque se funde antes del área de texto (Ruling R3): sobre estos colores
+   * `text-muted` no llegaría a 4.5:1, así que el texto nunca debe quedar encima.
    */
-  light: string;
-  /** Color del brillo radial en modo oscuro (tono profundo). */
-  dark: string;
+  glow: { light: string; dark: string };
 };
 
 const TONES: Record<Tone["key"], Tone> = {
-  fresco: { key: "fresco", light: "#A9C3DC", dark: "#1F3A52" },
-  amaderado: { key: "amaderado", light: "#CDB291", dark: "#3A2A1E" },
-  dulce: { key: "dulce", light: "#E6BE7E", dark: "#47331A" },
-  especiado: { key: "especiado", light: "#DBA88E", dark: "#4A2519" },
-  natural: { key: "natural", light: "#B8C79F", dark: "#28331F" },
-  bronce: { key: "bronce", light: "#D6BB8E", dark: "#33291E" },
+  fresco: { key: "fresco", glow: { light: "#6F9FD3", dark: "#4A8BD0" } },
+  amaderado: { key: "amaderado", glow: { light: "#B9864F", dark: "#B07A44" } },
+  dulce: { key: "dulce", glow: { light: "#E2A23E", dark: "#D9982F" } },
+  especiado: { key: "especiado", glow: { light: "#D4764F", dark: "#C9603A" } },
+  natural: { key: "natural", glow: { light: "#8EAE5E", dark: "#7C9C4C" } },
+  bronce: { key: "bronce", glow: { light: "#C9A66B", dark: "#C9A66B" } },
 };
 
 const TAG_TONE: Record<string, Tone["key"]> = {

@@ -93,6 +93,72 @@ body {
   }
 }
 
+/*
+ * Aura de la foto en la vitrina (inspirada en la landing de Ardentium): un borde de luz que gira
+ * alrededor del marco, con el color del tono del producto (--glow). Con reduced-motion la regla
+ * global deja la animación en una sola vuelta instantánea: el borde queda quieto.
+ */
+@property --rim {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes showcase-rim {
+  to {
+    --rim: 360deg;
+  }
+}
+
+@keyframes showcase-float {
+  50% {
+    translate: 0 -8px;
+  }
+}
+
+@keyframes showcase-breathe {
+  0%,
+  100% {
+    opacity: 0.7;
+    scale: 0.94;
+  }
+  50% {
+    opacity: 1;
+    scale: 1.04;
+  }
+}
+
+.showcase-rim::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--rim),
+    transparent 0 55%,
+    var(--glow) 72%,
+    rgb(255 255 255 / 0.85) 78%,
+    transparent 88%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: showcase-rim 6s linear infinite;
+}
+
+.showcase-float {
+  animation: showcase-float 7s ease-in-out infinite;
+}
+
+.showcase-breathe {
+  animation: showcase-breathe 6s ease-in-out infinite;
+}
+
 @keyframes menu-sheet-in {
   from {
     opacity: 0;

@@ -6,6 +6,7 @@ import {
   type CSSProperties,
   type FocusEvent,
   type KeyboardEvent,
+  type PointerEvent,
   useEffect,
   useEffectEvent,
   useId,
@@ -33,7 +34,7 @@ const SCROLL_SETTLE_MS = 120;
 const JUMP_DIP_MS = 360;
 const JUMP_DIP_LOW = 0.4;
 const PARALLAX_PX = 24;
-/** Alto del área de la foto; el brillo del tono usa el mismo para quedar justo detrás. */
+/** Alto del área de la foto; el aura del tono vive dentro de ella y se funde antes del texto. */
 const IMAGE_AREA_HEIGHT = "h-[38svh] min-h-60 md:h-[520px]";
 const IMAGE_SIZES = "(min-width: 1024px) 336px, (min-width: 768px) 272px, 60vw";
 
@@ -219,29 +220,6 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
       className="relative isolate overflow-hidden rounded-2xl border border-line bg-surface md:rounded-3xl"
     >
       {/*
-        Brillo del tono de cada producto, justo detrás del área de la foto (arriba en móvil, a la
-        derecha en desktop). Se apaga antes de los bordes de esa área: el texto nunca queda encima del
-        tono y mantiene el contraste de la superficie. El activo aparece con un fundido continuo.
-      */}
-      <div
-        aria-hidden="true"
-        className={`pointer-events-none absolute inset-x-0 top-0 -z-10 md:left-1/2 ${IMAGE_AREA_HEIGHT}`}
-      >
-        {products.map((product, index) => {
-          const tone = toneFor(product);
-          return (
-            <div
-              key={product.id}
-              style={{ "--tone-light": tone.light, "--tone-dark": tone.dark } as CSSProperties}
-              className={`absolute inset-0 bg-[radial-gradient(closest-side,var(--tone)_0%,var(--tone)_70%,transparent_100%)] transition-opacity duration-400 ease-out [--tone:var(--tone-light)] dark:[--tone:var(--tone-dark)] ${
-                index === active ? "opacity-100" : "opacity-0"
-              }`}
-            />
-          );
-        })}
-      </div>
-
-      {/*
         Control de rotación: primero en el orden de foco y de lectura (patrón WAI-ARIA). Va arriba a
         la derecha, sobre el área de la foto (nunca sobre el texto), en móvil y en desktop.
       */}
@@ -275,6 +253,7 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
             active={index === active}
             inert={hydrated && index !== active}
             parallaxY={reducedMotion ? undefined : parallaxY}
+            reducedMotion={reducedMotion}
           />
         ))}
       </div>
@@ -330,10 +309,40 @@ type SlideProps = {
   active: boolean;
   inert: boolean;
   parallaxY: MotionValue<number> | undefined;
+  reducedMotion: boolean;
 };
 
-function Slide({ ref, product, index, count, active, inert, parallaxY }: SlideProps) {
+/** Inclinación máxima del marco hacia el mouse, en grados (eje X / eje Y). */
+const TILT_X = 8;
+const TILT_Y = 10;
+
+function Slide({ ref, product, index, count, active, inert, parallaxY, reducedMotion }: SlideProps) {
   const { soldOut, label: price, orderHref } = cardPricing(product);
+  const { glow } = toneFor(product);
+  const frameRef = useRef<HTMLDivElement>(null);
+
+  // Inclinación 3D y reflejo que siguen al mouse (solo mouse, solo la activa, sin reduced-motion).
+  // Se escriben como variables CSS en el marco: sin re-render por cada movimiento.
+  function onPointerMove(event: PointerEvent<HTMLDivElement>) {
+    const frame = frameRef.current;
+    if (!frame || !active || reducedMotion || event.pointerType !== "mouse") return;
+    const rect = frame.getBoundingClientRect();
+    const px = Math.min(Math.max((event.clientX - rect.left) / rect.width, 0), 1);
+    const py = Math.min(Math.max((event.clientY - rect.top) / rect.height, 0), 1);
+    frame.style.setProperty("--rx", `${((0.5 - py) * TILT_X * 2).toFixed(2)}deg`);
+    frame.style.setProperty("--ry", `${((px - 0.5) * TILT_Y * 2).toFixed(2)}deg`);
+    frame.style.setProperty("--gx", `${(px * 100).toFixed(1)}%`);
+    frame.style.setProperty("--gy", `${(py * 100).toFixed(1)}%`);
+    frame.dataset.glare = "on";
+  }
+
+  function onPointerLeave() {
+    const frame = frameRef.current;
+    if (!frame) return;
+    frame.style.setProperty("--rx", "0deg");
+    frame.style.setProperty("--ry", "0deg");
+    delete frame.dataset.glare;
+  }
   const line = product.notes?.top ? `Salida: ${product.notes.top}` : product.description || product.subtitle;
   const tags = product.tags.slice(0, 2);
 
@@ -412,24 +421,65 @@ function Slide({ ref, product, index, count, active, inert, parallaxY }: SlidePr
         </div>
       </div>
 
-      {/* Decorativa: el nombre ya está en el h2. Sin foto, el placeholder se anuncia "Sin foto". */}
-      <div className={`relative order-first flex items-center justify-center md:order-none ${IMAGE_AREA_HEIGHT}`}>
-        <motion.div style={parallaxY ? { y: parallaxY } : undefined} className="relative h-[86%] md:h-[340px] lg:h-[420px]">
+      {/*
+        Decorativa: el nombre ya está en el h2. Sin foto, el placeholder se anuncia "Sin foto".
+        Aura de la foto (al estilo de la landing de Ardentium): halo difuminado del tono que respira,
+        sombra de color que irradia, borde de luz que gira, flotación suave y, con mouse, inclinación
+        3D con reflejo. Todo queda dentro del área de la foto (el halo se recorta en sus bordes), así
+        que el texto nunca queda sobre el color (Ruling R3).
+      */}
+      <div
+        onPointerMove={onPointerMove}
+        onPointerLeave={onPointerLeave}
+        style={{ "--glow-light": glow.light, "--glow-dark": glow.dark } as CSSProperties}
+        className={`relative order-first flex items-center justify-center [perspective:900px] [--glow:var(--glow-light)] md:order-none dark:[--glow:var(--glow-dark)] ${IMAGE_AREA_HEIGHT}`}
+      >
+        {/* La máscara funde el halo hacia los bordes del área: no hay corte visible y nunca llega al texto. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden [mask-image:radial-gradient(farthest-side,#000_72%,transparent)]"
+        >
           <div
-            className={`relative aspect-4/5 h-full overflow-hidden rounded-2xl bg-surface shadow-[0_24px_48px_-24px_rgb(20_20_20/0.45)] transition-transform duration-400 ease-out ${
-              active ? "-rotate-3 scale-100" : "rotate-0 scale-[0.92]"
+            className={`absolute top-1/2 left-1/2 aspect-square h-[96%] -translate-x-1/2 -translate-y-1/2 transition-opacity duration-500 ease-out md:h-[480px] lg:h-[520px] ${
+              active ? "opacity-100" : "opacity-0"
             }`}
           >
-            <SafeImage
-              src={product.images[0]}
-              alt=""
-              fill
-              preload={index === 0}
-              // La 2 es la próxima en entrar (auto-avance o swipe): sin esperar al lazy-load. De la 3 en adelante, diferidas.
-              loading={index === 1 ? "eager" : undefined}
-              sizes={IMAGE_SIZES}
-              className={`object-cover ${soldOut ? "opacity-60" : ""}`}
+            {/* Halo amplio: tiñe el aire alrededor de la foto. */}
+            <div className="absolute inset-0 rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklab,var(--glow)_85%,transparent)_35%,transparent)] blur-3xl" />
+            {/* Núcleo intenso que asoma por los bordes del marco: la "luz" que respira. */}
+            <div
+              className={`absolute inset-[8%] rounded-full bg-[radial-gradient(closest-side,var(--glow)_55%,transparent)] blur-[40px] ${
+                active ? "showcase-breathe" : ""
+              }`}
             />
+          </div>
+        </div>
+
+        <motion.div style={parallaxY ? { y: parallaxY } : undefined} className="relative h-[86%] md:h-[340px] lg:h-[420px]">
+          <div className={`h-full ${active ? "showcase-float" : ""}`}>
+            <div
+              ref={frameRef}
+              style={{ transform: "rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))" }}
+              className={`group/frame showcase-rim relative aspect-4/5 h-full overflow-hidden rounded-2xl bg-surface shadow-[0_24px_48px_-24px_rgb(20_20_20/0.45),0_0_90px_-8px_var(--glow)] transition-[transform,rotate,scale,box-shadow] duration-400 ease-out ${
+                active ? "-rotate-3 scale-100" : "rotate-0 scale-[0.92]"
+              }`}
+            >
+              <SafeImage
+                src={product.images[0]}
+                alt=""
+                fill
+                preload={index === 0}
+                // La 2 es la próxima en entrar (auto-avance o swipe): sin esperar al lazy-load. De la 3 en adelante, diferidas.
+                loading={index === 1 ? "eager" : undefined}
+                sizes={IMAGE_SIZES}
+                className={`object-cover ${soldOut ? "opacity-60" : ""}`}
+              />
+              {/* Reflejo que sigue al mouse. */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 z-1 bg-[radial-gradient(45%_40%_at_var(--gx,50%)_var(--gy,30%),rgb(255_255_255/0.35),transparent_70%)] opacity-0 mix-blend-soft-light transition-opacity duration-500 group-data-[glare=on]/frame:opacity-100"
+              />
+            </div>
           </div>
         </motion.div>
       </div>
