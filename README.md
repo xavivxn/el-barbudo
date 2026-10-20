@@ -32,7 +32,7 @@ Documentadas en `.env.example`:
 | `ADMIN_PASSWORD` | Contraseña única del panel `/admin`. |
 | `SESSION_SECRET` | Secreto que sella la cookie de sesión. Mínimo 32 caracteres. |
 | `DEMO_MODE` | `false` para la tienda real. Si falta (o tiene cualquier otro valor), el sitio corre en modo demo (ver abajo). |
-| `NEXT_PUBLIC_WHATSAPP_NUMBER` | Número del local, solo dígitos con código de país (ej. `5959XXXXXXXX`). Next lo incorpora al código en el build: si lo cambiás, hay que volver a desplegar. El de `.env.example` (`595000000000`) es un marcador que no es de nadie; si falta la variable, los enlaces usan ese mismo marcador de `src/site.ts`. |
+| `NEXT_PUBLIC_WHATSAPP_NUMBER` | Número del local, solo dígitos con código de país (ej. `5959XXXXXXXX`). Next lo incorpora al código en el build: si lo cambiás, hay que volver a desplegar. El de `.env.example` (`595000000000`) es un marcador que no es de nadie; si falta la variable, los enlaces usan el número del local de `src/site.ts` (`595972197691`, o sea 0972 197 691). |
 
 Con `NODE_ENV=production` la aplicación rechaza los valores de ejemplo de `.env.example`: con el `SESSION_SECRET` de ejemplo el admin falla con un error claro, y con la `ADMIN_PASSWORD` de ejemplo nadie puede entrar (el log avisa, sin escribir el valor). `DATABASE_URL` es obligatoria fuera de desarrollo y pruebas, tanto en la app como en `prisma.config.ts`. Si `ADMIN_PASSWORD` se pega con comillas o espacios alrededor (`"mi-clave"`), se ignoran.
 
@@ -44,7 +44,7 @@ Sin `DEMO_MODE=false`, el sitio corre como **demo**: está prendido por defecto,
 
 - La tienda lee el catálogo de ejemplo de `src/lib/catalog-data.ts` en memoria (el mismo que carga el seed): no usa la base y no necesita `DATABASE_URL`.
 - El panel `/admin` (login incluido) muestra un aviso de que está deshabilitado, y sus acciones no escriben nada.
-- La tienda se ve igual que la real, sin avisos. Sin `NEXT_PUBLIC_WHATSAPP_NUMBER`, los pedidos van al número marcador de `src/site.ts`.
+- La tienda se ve igual que la real, sin avisos. Sin `NEXT_PUBLIC_WHATSAPP_NUMBER`, los pedidos van al número del local de `src/site.ts` (0972 197 691).
 - El build no comprueba las variables de producción.
 
 Para la tienda real: `DEMO_MODE=false` más las 4 variables de arriba (`DATABASE_URL`, `ADMIN_PASSWORD`, `SESSION_SECRET` y `NEXT_PUBLIC_WHATSAPP_NUMBER`). Definila también para el build: la página de login del admin y el 404 se generan en el build con el modo que haya en ese momento.

@@ -1,14 +1,14 @@
 /**
  * Comprobación de variables de entorno al hacer el build de producción (la llama `next.config.ts`).
  *
- * Sin `NEXT_PUBLIC_WHATSAPP_NUMBER`, los pedidos irían al número de respaldo de `src/site.ts`: un
- * marcador que no es de nadie, así que el build falla antes de publicar una tienda que no recibe
- * pedidos. Los mensajes nombran la variable, nunca su valor.
+ * Sin `NEXT_PUBLIC_WHATSAPP_NUMBER`, los pedidos van al número de respaldo de `src/site.ts`; igual
+ * el build de producción exige la variable (y que no sea el marcador de `.env.example`) para que el
+ * número del local se configure a propósito. Los mensajes nombran la variable, nunca su valor.
  *
  * Sin imports: `next.config.ts` lo carga antes de que existan los alias `@/`.
  */
 
-/** Número de ejemplo de `src/site.ts` y `.env.example`. No es un número real (hay un test que lo alinea). */
+/** Número de ejemplo de `.env.example`. No es un número real (hay un test que lo alinea). */
 export const PLACEHOLDER_WHATSAPP_NUMBER = "595000000000";
 
 type Env = Record<string, string | undefined>;

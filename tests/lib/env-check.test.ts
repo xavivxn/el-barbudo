@@ -112,8 +112,8 @@ describe("isDemoMode", () => {
 });
 
 describe("número de ejemplo", () => {
-  it("es el mismo en src/site.ts y en .env.example", () => {
-    expect(site.whatsapp).toBe(PLACEHOLDER_WHATSAPP_NUMBER);
+  it("está en .env.example y no es el número del local", () => {
+    expect(site.whatsapp).not.toBe(PLACEHOLDER_WHATSAPP_NUMBER);
     expect(readFileSync(".env.example", "utf8")).toContain(`NEXT_PUBLIC_WHATSAPP_NUMBER="${PLACEHOLDER_WHATSAPP_NUMBER}"`);
   });
 });
