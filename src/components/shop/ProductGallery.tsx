@@ -1,37 +1,55 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState, ViewTransition } from "react";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { usePrefersReducedMotion } from "@/lib/hooks/usePrefersReducedMotion";
+import { morphName } from "@/lib/morph";
 
 type ProductGalleryProps = {
   images: string[];
   name: string;
+  /** Slug del producto: la foto principal lleva su nombre de View Transition (la foto que vuela desde la tarjeta). */
+  slug?: string;
 };
 
 const SIZES = "(min-width: 768px) 50vw, 100vw";
 
-export function ProductGallery({ images, name }: ProductGalleryProps) {
+/**
+ * Destino de "la foto vuela a la ficha": en la ficha hay una sola galería, así que el nombre va
+ * siempre. `share="morph"` + `default="none"`: solo se anima al formar el par con la tarjeta.
+ */
+function MorphTarget({ slug, children }: { slug?: string; children: ReactNode }) {
+  if (!slug) return children;
+  return (
+    <ViewTransition name={morphName(slug)} share="morph" default="none">
+      {children}
+    </ViewTransition>
+  );
+}
+
+export function ProductGallery({ images, name, slug }: ProductGalleryProps) {
   if (images.length <= 1) {
     return (
-      <div className="relative aspect-4/5 overflow-hidden bg-surface">
-        {/* Sin foto: alt vacío para que el placeholder se anuncie como "Sin foto". */}
-        <SafeImage
-          src={images[0]}
-          alt={images[0] ? name : ""}
-          fill
-          preload
-          sizes={SIZES}
-          className="object-cover"
-        />
-      </div>
+      <MorphTarget slug={slug}>
+        <div className="relative aspect-4/5 overflow-hidden bg-surface">
+          {/* Sin foto: alt vacío para que el placeholder se anuncie como "Sin foto". */}
+          <SafeImage
+            src={images[0]}
+            alt={images[0] ? name : ""}
+            fill
+            preload
+            sizes={SIZES}
+            className="object-cover"
+          />
+        </div>
+      </MorphTarget>
     );
   }
 
-  return <MultiImageGallery images={images} name={name} />;
+  return <MultiImageGallery images={images} name={name} slug={slug} />;
 }
 
-function MultiImageGallery({ images, name }: ProductGalleryProps) {
+function MultiImageGallery({ images, name, slug }: ProductGalleryProps) {
   const stripRef = useRef<HTMLUListElement>(null);
   const [active, setActive] = useState(0);
   const reducedMotion = usePrefersReducedMotion();
@@ -52,30 +70,36 @@ function MultiImageGallery({ images, name }: ProductGalleryProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Se desliza con el dedo en móvil; con teclado se navega con las miniaturas (sin tabindex propio). */}
-      <ul
-        ref={stripRef}
-        tabIndex={-1}
-        onScroll={onScroll}
-        aria-label={`Fotos de ${name}`}
-        className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] focus:outline-none [&::-webkit-scrollbar]:hidden"
-      >
-        {images.map((src, index) => (
-          <li
-            key={src}
-            className="relative aspect-4/5 w-full shrink-0 snap-center overflow-hidden bg-surface"
-          >
-            <SafeImage
-              src={src}
-              alt={`${name}, foto ${index + 1} de ${images.length}`}
-              fill
-              preload={index === 0}
-              sizes={SIZES}
-              className="object-cover"
-            />
-          </li>
-        ))}
-      </ul>
+      {/*
+        Se desliza con el dedo en móvil; con teclado se navega con las miniaturas (sin tabindex propio).
+        El nombre de View Transition va en el riel (no en la primera foto): al llegar muestra la
+        primera y, si se cambió de foto, la captura es la que está a la vista, nunca una fuera del recorte.
+      */}
+      <MorphTarget slug={slug}>
+        <ul
+          ref={stripRef}
+          tabIndex={-1}
+          onScroll={onScroll}
+          aria-label={`Fotos de ${name}`}
+          className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] focus:outline-none [&::-webkit-scrollbar]:hidden"
+        >
+          {images.map((src, index) => (
+            <li
+              key={src}
+              className="relative aspect-4/5 w-full shrink-0 snap-center overflow-hidden bg-surface"
+            >
+              <SafeImage
+                src={src}
+                alt={`${name}, foto ${index + 1} de ${images.length}`}
+                fill
+                preload={index === 0}
+                sizes={SIZES}
+                className="object-cover"
+              />
+            </li>
+          ))}
+        </ul>
+      </MorphTarget>
 
       <ul className="flex gap-2 px-4 md:px-0" aria-label="Elegir foto">
         {images.map((src, index) => (

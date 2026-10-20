@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { ViewTransition } from "react";
 import { focusRing } from "@/components/ui/focus";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { usePointerVars } from "@/lib/hooks/usePointerVars";
+import { useProductMorph } from "@/lib/hooks/useProductMorph";
 import { cardPricing } from "@/lib/pricing";
 import type { ProductDTO } from "@/lib/types";
 
@@ -23,6 +25,7 @@ export function ProductCard({ product, headingLevel = 3, sizes = GRID_SIZES }: P
   const Heading = headingLevel === 2 ? "h2" : "h3";
   const href = `/productos/${product.slug}`;
   const { onPointerMove } = usePointerVars<HTMLElement>();
+  const morph = useProductMorph(product.slug);
   const { soldOut, label: price, orderHref, orderVariant: cheapest } = cardPricing(product);
 
   return (
@@ -31,23 +34,29 @@ export function ProductCard({ product, headingLevel = 3, sizes = GRID_SIZES }: P
       className="card-spotlight group relative isolate flex h-full flex-col transition-transform duration-200 hover:-translate-y-0.5"
     >
       <div className="relative">
-        {/* Duplica el enlace del nombre: fuera del orden de tabulación y del árbol accesible. */}
-        <Link
-          href={href}
-          tabIndex={-1}
-          aria-hidden="true"
-          className="relative block aspect-4/5 overflow-hidden bg-surface"
-        >
-          <SafeImage
-            src={product.images[0]}
-            alt=""
-            fill
-            sizes={sizes}
-            className={`object-cover transition-transform duration-300 group-hover:scale-105 ${
-              soldOut ? "opacity-50" : ""
-            }`}
-          />
-        </Link>
+        {/*
+          Duplica el enlace del nombre: fuera del orden de tabulación y del árbol accesible. La foto
+          vuela a la ficha (View Transition): el nombre se arma solo en esta tarjeta al activarla.
+        */}
+        <ViewTransition key={morph.generation} name={morph.name} share="morph" default="none">
+          <Link
+            href={href}
+            tabIndex={-1}
+            aria-hidden="true"
+            {...morph.handlers}
+            className="relative block aspect-4/5 overflow-hidden bg-surface"
+          >
+            <SafeImage
+              src={product.images[0]}
+              alt=""
+              fill
+              sizes={sizes}
+              className={`object-cover transition-transform duration-300 group-hover:scale-105 ${
+                soldOut ? "opacity-50" : ""
+              }`}
+            />
+          </Link>
+        </ViewTransition>
         {soldOut ? (
           <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-bg px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-fg">
             Agotado
@@ -57,7 +66,11 @@ export function ProductCard({ product, headingLevel = 3, sizes = GRID_SIZES }: P
 
       <div className="flex flex-1 flex-col pt-4">
         <Heading className="font-serif text-xl font-medium leading-tight md:text-2xl">
-          <Link href={href} className={`-my-2.5 inline-block py-2.5 underline-offset-4 hover:underline ${focusRing}`}>
+          <Link
+            href={href}
+            {...morph.handlers}
+            className={`-my-2.5 inline-block py-2.5 underline-offset-4 hover:underline ${focusRing}`}
+          >
             {product.name}
           </Link>
         </Heading>

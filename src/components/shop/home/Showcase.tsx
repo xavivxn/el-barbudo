@@ -13,6 +13,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  ViewTransition,
 } from "react";
 import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/Button";
@@ -21,6 +22,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { usePrefersReducedMotion } from "@/lib/hooks/usePrefersReducedMotion";
+import { useProductMorph } from "@/lib/hooks/useProductMorph";
 import { cardPricing } from "@/lib/pricing";
 import { wrapIndex } from "@/lib/showcase";
 import { toneFor } from "@/lib/tone";
@@ -320,6 +322,8 @@ function Slide({ ref, product, index, count, active, inert, parallaxY, reducedMo
   const { soldOut, label: price, orderHref } = cardPricing(product);
   const { glow } = toneFor(product);
   const frameRef = useRef<HTMLDivElement>(null);
+  // La foto enmarcada vuela a la ficha con "Ver producto".
+  const morph = useProductMorph(product.slug);
 
   // Inclinación 3D y reflejo que siguen al mouse (solo mouse, solo la activa, sin reduced-motion).
   // Se escriben como variables CSS en el marco: sin re-render por cada movimiento.
@@ -414,6 +418,7 @@ function Slide({ ref, product, index, count, active, inert, parallaxY, reducedMo
           <Button
             variant="secondary"
             href={`/productos/${product.slug}`}
+            {...morph.handlers}
             className={ctaFit}
           >
             Ver producto
@@ -457,29 +462,32 @@ function Slide({ ref, product, index, count, active, inert, parallaxY, reducedMo
 
         <motion.div style={parallaxY ? { y: parallaxY } : undefined} className="relative h-[86%] md:h-[340px] lg:h-[420px]">
           <div className={`h-full ${active ? "showcase-float" : ""}`}>
-            <div
-              ref={frameRef}
-              style={{ transform: "rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))" }}
-              className={`group/frame showcase-rim relative aspect-4/5 h-full overflow-hidden rounded-2xl bg-surface shadow-[0_24px_48px_-24px_rgb(20_20_20/0.45),0_0_90px_-8px_var(--glow)] transition-[transform,rotate,scale,box-shadow] duration-400 ease-out ${
-                active ? "-rotate-3 scale-100" : "rotate-0 scale-[0.92]"
-              }`}
-            >
-              <SafeImage
-                src={product.images[0]}
-                alt=""
-                fill
-                preload={index === 0}
-                // La 2 es la próxima en entrar (auto-avance o swipe): sin esperar al lazy-load. De la 3 en adelante, diferidas.
-                loading={index === 1 ? "eager" : undefined}
-                sizes={IMAGE_SIZES}
-                className={`object-cover ${soldOut ? "opacity-60" : ""}`}
-              />
-              {/* Reflejo que sigue al mouse. */}
+            {/* Nombre de View Transition solo al activar "Ver producto" (ver useProductMorph). */}
+            <ViewTransition key={morph.generation} name={morph.name} share="morph" default="none">
               <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 z-1 bg-[radial-gradient(45%_40%_at_var(--gx,50%)_var(--gy,30%),rgb(255_255_255/0.35),transparent_70%)] opacity-0 mix-blend-soft-light transition-opacity duration-500 group-data-[glare=on]/frame:opacity-100"
-              />
-            </div>
+                ref={frameRef}
+                style={{ transform: "rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))" }}
+                className={`group/frame showcase-rim relative aspect-4/5 h-full overflow-hidden rounded-2xl bg-surface shadow-[0_24px_48px_-24px_rgb(20_20_20/0.45),0_0_90px_-8px_var(--glow)] transition-[transform,rotate,scale,box-shadow] duration-400 ease-out ${
+                  active ? "-rotate-3 scale-100" : "rotate-0 scale-[0.92]"
+                }`}
+              >
+                <SafeImage
+                  src={product.images[0]}
+                  alt=""
+                  fill
+                  preload={index === 0}
+                  // La 2 es la próxima en entrar (auto-avance o swipe): sin esperar al lazy-load. De la 3 en adelante, diferidas.
+                  loading={index === 1 ? "eager" : undefined}
+                  sizes={IMAGE_SIZES}
+                  className={`object-cover ${soldOut ? "opacity-60" : ""}`}
+                />
+                {/* Reflejo que sigue al mouse. */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 z-1 bg-[radial-gradient(45%_40%_at_var(--gx,50%)_var(--gy,30%),rgb(255_255_255/0.35),transparent_70%)] opacity-0 mix-blend-soft-light transition-opacity duration-500 group-data-[glare=on]/frame:opacity-100"
+                />
+              </div>
+            </ViewTransition>
           </div>
         </motion.div>
       </div>

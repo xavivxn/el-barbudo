@@ -48,7 +48,13 @@ export default async function ProductPage(props: PageProps<"/productos/[slug]">)
     <div className="mx-auto max-w-6xl px-4 pb-20 md:px-8 md:pb-28 md:pt-12">
       <div className="grid gap-8 md:grid-cols-2 md:gap-12 lg:gap-16">
         <div className="-mx-4 md:sticky md:top-20 md:mx-0 md:self-start">
-          <ProductGallery images={product.images} name={product.name} />
+          {/* `key`: otra ficha es otra galería (y otro nombre de View Transition), nunca un renombre. */}
+          <ProductGallery
+            key={product.slug}
+            slug={product.slug}
+            images={product.images}
+            name={product.name}
+          />
         </div>
 
         <div className="flex flex-col">

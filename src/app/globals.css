@@ -230,6 +230,36 @@ body {
   }
 }
 
+/*
+ * "La foto vuela a la ficha" (View Transitions de React, ver useProductMorph y ProductGallery): la
+ * foto de la tarjeta o la vitrina se transforma en la de la ficha en 400 ms, con un desenfoque leve
+ * a mitad de vuelo que tapa los saltos de interpolación. El resto de la página hace un crossfade
+ * corto. Sin soporte del navegador no hay transición: se navega normal.
+ */
+::view-transition-group(.morph) {
+  animation-duration: 400ms;
+  animation-timing-function: ease-out;
+}
+
+::view-transition-image-pair(.morph) {
+  animation-name: morph-blur;
+}
+
+@keyframes morph-blur {
+  30% {
+    filter: blur(3px);
+  }
+}
+
+::view-transition-group(root) {
+  animation-duration: 180ms;
+}
+
+/* Los clics durante la transición llegan a la página (la capa de la transición no los atrapa). */
+::view-transition {
+  pointer-events: none;
+}
+
 @keyframes menu-sheet-in {
   from {
     opacity: 0;
@@ -273,5 +303,17 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /*
+   * Sin animaciones de View Transition: el cambio de página es instantáneo. Regla aparte: un
+   * navegador que no conoce estos pseudo-elementos descartaría la lista entera de arriba.
+   */
+  ::view-transition-group(*),
+  ::view-transition-image-pair(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }
