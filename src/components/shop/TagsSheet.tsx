@@ -78,7 +78,13 @@ export function TagsSheet({ current, tags, className = "" }: TagsSheetProps) {
               <X size={20} aria-hidden="true" />
             </a>
           </div>
-          <ul className="mt-3 flex flex-wrap gap-2">
+          <ul
+            className="mt-3 flex flex-wrap gap-2"
+            // Elegir una etiqueta cierra la hoja en el acto; el enlace navega igual.
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest("a")) dialogRef.current?.close();
+            }}
+          >
             {tags.map((tag) => {
               const isActive = active === tag;
               return (
@@ -91,7 +97,11 @@ export function TagsSheet({ current, tags, className = "" }: TagsSheetProps) {
             })}
           </ul>
           {active ? (
-            <Chip href={buildCatalogHref(current, { etiqueta: null })} className="mt-4 gap-2 border-fg">
+            <Chip
+              href={buildCatalogHref(current, { etiqueta: null })}
+              className="mt-4 gap-2 border-fg"
+              onClick={() => dialogRef.current?.close()}
+            >
               <X size={16} aria-hidden="true" />
               Quitar etiqueta
             </Chip>
