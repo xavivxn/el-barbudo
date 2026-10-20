@@ -31,11 +31,23 @@ Documentadas en `.env.example`:
 | `DATABASE_URL` | Conexión a la base. En local: `file:./dev.db`. |
 | `ADMIN_PASSWORD` | Contraseña única del panel `/admin`. |
 | `SESSION_SECRET` | Secreto que sella la cookie de sesión. Mínimo 32 caracteres. |
+| `DEMO_MODE` | `false` para la tienda real. Si falta (o tiene cualquier otro valor), el sitio corre en modo demo (ver abajo). |
 | `NEXT_PUBLIC_WHATSAPP_NUMBER` | Número del local, solo dígitos con código de país (ej. `5959XXXXXXXX`). Next lo incorpora al código en el build: si lo cambiás, hay que volver a desplegar. El de `.env.example` (`595000000000`) es un marcador que no es de nadie; si falta la variable, los enlaces usan ese mismo marcador de `src/site.ts`. |
 
 Con `NODE_ENV=production` la aplicación rechaza los valores de ejemplo de `.env.example`: con el `SESSION_SECRET` de ejemplo el admin falla con un error claro, y con la `ADMIN_PASSWORD` de ejemplo nadie puede entrar (el log avisa, sin escribir el valor). `DATABASE_URL` es obligatoria fuera de desarrollo y pruebas, tanto en la app como en `prisma.config.ts`. Si `ADMIN_PASSWORD` se pega con comillas o espacios alrededor (`"mi-clave"`), se ignoran.
 
 Para generar un secreto: `openssl rand -base64 48`.
+
+### Modo demo
+
+Sin `DEMO_MODE=false`, el sitio corre como **demo**: está prendido por defecto, así que un deploy en Vercel sin ninguna variable de entorno funciona tal cual.
+
+- La tienda lee el catálogo de ejemplo de `src/lib/catalog-data.ts` en memoria (el mismo que carga el seed): no usa la base y no necesita `DATABASE_URL`.
+- El panel `/admin` (login incluido) muestra un aviso de que está deshabilitado, y sus acciones no escriben nada.
+- Arriba de la tienda aparece una franja que avisa que productos, precios y WhatsApp son de ejemplo. Sin `NEXT_PUBLIC_WHATSAPP_NUMBER`, los pedidos van al número marcador de `src/site.ts`.
+- El build no comprueba las variables de producción.
+
+Para la tienda real: `DEMO_MODE=false` más las 4 variables de arriba (`DATABASE_URL`, `ADMIN_PASSWORD`, `SESSION_SECRET` y `NEXT_PUBLIC_WHATSAPP_NUMBER`). Definila también para el build: la página de login del admin y el 404 se generan en el build con el modo que haya en ese momento.
 
 ### El seed borra todo
 
@@ -45,7 +57,7 @@ Para generar un secreto: `openssl rand -base64 48`.
 
 - **Datos del local** en `src/site.ts`: dirección, horarios, Instagram, número de WhatsApp de respaldo y los textos de "Sobre El Barbudo" son datos de ejemplo.
 - **Fotos de productos**: las del seed son marcadores de posición. Reemplazalas desde el admin (`/admin`, editar producto) pegando las URLs `https://` de las fotos reales, una por línea. Algunos productos no tienen foto y muestran un marcador neutro.
-- **Logo**: `public/logo.jpg` es un JPG de 150 px, así que se ve algo suave al ampliarlo. Pedí a la marca el logo en SVG. Cambiar solo el archivo no alcanza: es un único componente, `src/components/ui/Logo.tsx`, usado en 3 lugares (Header, Footer y login del admin), y está pensado para ese JPG negro sobre blanco: la variante `mark` recorta la barba con posiciones fijas, ambas variantes pasan `width`/`height` de 150, y las clases `mix-blend-multiply dark:invert dark:mix-blend-screen` mezclan el fondo blanco y lo invierten en modo oscuro. Con un SVG hay que editar ese componente: actualizar `src`, rehacer o quitar el recorte de `mark` (conviene un SVG propio de solo la barba) y reemplazar el mezclado/inversión por `currentColor` o por una versión clara y otra oscura. Los íconos de la pestaña y de iOS (`src/app/icon.png`, 192 px, y `src/app/apple-icon.png`, 180 px) son la barba recortada de ese mismo JPG: rehacelos con el logo nuevo.
+- **Logo**: `public/logo.jpg` es un JPG de 150 px, así que se ve algo suave al ampliarlo. Pedí a la marca el logo en SVG. Cambiar solo el archivo no alcanza: es un único componente, `src/components/ui/Logo.tsx`, usado en 4 lugares (Header, Footer, login del admin y el aviso del admin en modo demo), y está pensado para ese JPG negro sobre blanco: la variante `mark` recorta la barba con posiciones fijas, ambas variantes pasan `width`/`height` de 150, y las clases `mix-blend-multiply dark:invert dark:mix-blend-screen` mezclan el fondo blanco y lo invierten en modo oscuro. Con un SVG hay que editar ese componente: actualizar `src`, rehacer o quitar el recorte de `mark` (conviene un SVG propio de solo la barba) y reemplazar el mezclado/inversión por `currentColor` o por una versión clara y otra oscura. Los íconos de la pestaña y de iOS (`src/app/icon.png`, 192 px, y `src/app/apple-icon.png`, 180 px) son la barba recortada de ese mismo JPG: rehacelos con el logo nuevo.
 
 ## Seguridad del admin
 
@@ -92,9 +104,9 @@ En local se usa SQLite. En producción necesitás una base persistente: Vercel n
    DATABASE_URL="postgresql://USUARIO:CLAVE@ep-xxxx.region.aws.neon.tech/neondb?sslmode=require" \
      npx prisma db seed
    ```
-5. **Variables de entorno en Vercel** (Project Settings → Environment Variables), las 4, con valores fuertes y propios, distintos de los de `.env.example`:
+5. **Variables de entorno en Vercel** (Project Settings → Environment Variables): `DEMO_MODE=false` (sin ella el sitio queda como demo, ver "Modo demo") y las 4, con valores fuertes y propios, distintos de los de `.env.example`:
    `DATABASE_URL` (la **con pooler** de Neon), `ADMIN_PASSWORD`, `SESSION_SECRET` (32 o más caracteres) y `NEXT_PUBLIC_WHATSAPP_NUMBER`.
-6. **Build**: el comando por defecto de Vercel (`next build`) alcanza. En el deploy de producción (`VERCEL_ENV=production`) el build **falla a propósito** si `NEXT_PUBLIC_WHATSAPP_NUMBER` falta, no tiene dígitos o es el marcador `595000000000`, o si falta `DATABASE_URL`, `ADMIN_PASSWORD` o `SESSION_SECRET`; el error nombra la variable, nunca su valor (`src/lib/env-check.ts`). Así no se publica una tienda que manda los pedidos a un número que no es del local. Los deploys de preview y el `npm run build` local no hacen esta comprobación; para probarla en tu equipo: `CHECK_PROD_ENV=1 npm run build`. El script `postinstall` ya corre `prisma generate` al instalar dependencias. No pongas `prisma migrate deploy` en el build con la variable `DATABASE_URL` del proyecto, porque es la del pooler. Las migraciones nuevas se aplican desde tu equipo con la URL directa:
+6. **Build**: el comando por defecto de Vercel (`next build`) alcanza. En el deploy de producción (`VERCEL_ENV=production`) y con `DEMO_MODE=false`, el build **falla a propósito** si `NEXT_PUBLIC_WHATSAPP_NUMBER` falta, no tiene dígitos o es el marcador `595000000000`, o si falta `DATABASE_URL`, `ADMIN_PASSWORD` o `SESSION_SECRET`; el error nombra la variable, nunca su valor (`src/lib/env-check.ts`). Así no se publica una tienda que manda los pedidos a un número que no es del local. Los deploys de preview y el `npm run build` local no hacen esta comprobación; para probarla en tu equipo: `CHECK_PROD_ENV=1 npm run build`. El script `postinstall` ya corre `prisma generate` al instalar dependencias. No pongas `prisma migrate deploy` en el build con la variable `DATABASE_URL` del proyecto, porque es la del pooler. Las migraciones nuevas se aplican desde tu equipo con la URL directa:
    ```bash
    DATABASE_URL="postgresql://...(directa)..." npx prisma migrate deploy
    ```
