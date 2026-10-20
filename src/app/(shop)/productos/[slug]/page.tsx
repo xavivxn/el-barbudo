@@ -7,6 +7,7 @@ import { ProductGallery } from "@/components/shop/ProductGallery";
 import { ProductGrid } from "@/components/shop/ProductGrid";
 import { ProductPurchase } from "@/components/shop/ProductPurchase";
 import { ScentPyramid } from "@/components/shop/ScentPyramid";
+import { sectionHeading } from "@/components/shop/sectionHeading";
 import { Chip } from "@/components/ui/Chip";
 import { buildCatalogHref } from "@/lib/catalog";
 import { getProductBySlug, listProducts, pickRelated } from "@/lib/products";
@@ -18,8 +19,6 @@ export const dynamic = "force-dynamic";
 
 // generateMetadata y la página piden el mismo producto: una sola consulta por request.
 const getProduct = cache(getProductBySlug);
-
-const sectionHeading = "mb-4 text-sm uppercase tracking-[0.16em] text-muted";
 
 export async function generateMetadata(
   props: PageProps<"/productos/[slug]">,

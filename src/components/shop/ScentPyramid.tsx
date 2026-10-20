@@ -2,6 +2,7 @@
 
 import { motion, type Variants } from "motion/react";
 import { type CSSProperties, useId } from "react";
+import { sectionHeading } from "@/components/shop/sectionHeading";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { usePrefersReducedMotion } from "@/lib/hooks/usePrefersReducedMotion";
 import type { Tone } from "@/lib/tone";
@@ -16,27 +17,32 @@ type ScentPyramidProps = {
 
 // Orden de lectura: de arriba (la salida, lo primero que se huele) a la base (lo que queda en la piel).
 // `custom` es el turno de entrada: la animación sube desde la base, así que el fondo va primero.
+// Cada barra es un trazo fino del tono, más intenso en el centro (`--bar-hi`) que en las puntas
+// (`--bar-lo`). Los tres anchos dibujan la pirámide; la intensidad crece hacia la base.
 const LAYERS = [
   {
     key: "top",
     label: "Salida",
     custom: 2,
-    // La barra más angosta y clara. Los tres anchos suman la forma de pirámide.
-    bar: "w-[45%] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--glow)_28%,transparent),color-mix(in_oklab,var(--glow)_42%,transparent))]",
+    // La más angosta y clara. En oscuro, más fuerte: sobre carbón, el 28–42 % casi no se ve.
+    bar: "w-[45%] [--bar-lo:28%] [--bar-hi:42%] dark:[--bar-lo:45%] dark:[--bar-hi:60%]",
   },
   {
     key: "heart",
     label: "Corazón",
     custom: 1,
-    bar: "w-[70%] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--glow)_52%,transparent),color-mix(in_oklab,var(--glow)_68%,transparent))]",
+    bar: "w-[70%] [--bar-lo:52%] [--bar-hi:68%] dark:[--bar-lo:58%] dark:[--bar-hi:74%]",
   },
   {
     key: "base",
     label: "Fondo",
     custom: 0,
-    bar: "w-full bg-[linear-gradient(180deg,color-mix(in_oklab,var(--glow)_78%,transparent),color-mix(in_oklab,var(--glow)_92%,transparent))]",
+    bar: "w-full [--bar-lo:78%] [--bar-hi:92%]",
   },
 ] as const;
+
+const barBase =
+  "mx-auto mb-3 block h-1.5 rounded-full bg-[linear-gradient(90deg,color-mix(in_oklab,var(--glow)_var(--bar-lo),transparent),color-mix(in_oklab,var(--glow)_var(--bar-hi),transparent),color-mix(in_oklab,var(--glow)_var(--bar-lo),transparent))]";
 
 /** Cada capa aparece 250 ms; entre una y la siguiente pasan 120 ms. */
 const STEP_S = 0.12;
@@ -50,7 +56,8 @@ const layerVariants: Variants = {
 };
 
 /**
- * Pirámide olfativa: salida, corazón y fondo como tres barras que se ensanchan hacia la base.
+ * Pirámide olfativa: salida, corazón y fondo, cada una con un trazo fino del tono que se ensancha
+ * hacia la base.
  *
  * El texto va siempre sobre la superficie de la página (nunca sobre el color), así el contraste no
  * depende del tono. Las barras son decorativas; la semántica es una lista de definiciones en orden de
@@ -74,7 +81,7 @@ export function ScentPyramid({ notes, glow }: ScentPyramidProps) {
       style={{ "--glow-light": glow.light, "--glow-dark": glow.dark } as CSSProperties}
       className="mt-10 [--glow:var(--glow-light)] dark:[--glow:var(--glow-dark)]"
     >
-      <h2 id={headingId} className="mb-6 font-serif text-3xl font-medium md:text-4xl">
+      <h2 id={headingId} className={sectionHeading}>
         Pirámide olfativa
       </h2>
       <motion.dl
@@ -83,15 +90,13 @@ export function ScentPyramid({ notes, glow }: ScentPyramidProps) {
         initial={armed ? "hidden" : false}
         whileInView="shown"
         viewport={{ once: true, amount: 0.4 }}
-        className="flex flex-col gap-6"
+        className="flex flex-col gap-6 pt-2"
       >
         {LAYERS.map((layer) => (
           <motion.div key={layer.key} variants={layerVariants} custom={layer.custom}>
-            <div
-              aria-hidden="true"
-              className={`mx-auto h-9 rounded-full shadow-[inset_0_1px_0_rgb(255_255_255/0.4),inset_0_-1px_0_rgb(0_0_0/0.06)] md:h-10 ${layer.bar}`}
-            />
-            <dt className="mt-3 text-center text-xs font-medium tracking-[0.16em] text-muted uppercase">
+            {/* La barra va dentro del dt (un dl solo admite dt y dd en cada grupo). */}
+            <dt className="text-center text-xs font-medium tracking-[0.16em] text-muted uppercase">
+              <span aria-hidden="true" className={`${barBase} ${layer.bar}`} />
               {layer.label}
             </dt>
             <dd className="mx-auto mt-1 max-w-sm text-center text-balance">{notes[layer.key]}</dd>

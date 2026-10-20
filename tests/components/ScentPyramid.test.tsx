@@ -46,6 +46,24 @@ describe("ScentPyramid", () => {
     expect(container.querySelectorAll('[aria-hidden="true"]')).toHaveLength(3);
   });
 
+  it("la lista es válida: cada grupo del dl tiene solo dt y dd, y la barra va dentro del dt", () => {
+    const { container } = render(<ScentPyramid notes={notes} glow={glow} />);
+    for (const group of container.querySelectorAll("dl > div")) {
+      expect(Array.from(group.children).map((child) => child.tagName)).toEqual(["DT", "DD"]);
+      const bar = group.querySelector("dt > span");
+      expect(bar).toHaveAttribute("aria-hidden", "true");
+      // Barra fina, no una pastilla con aspecto de botón.
+      expect(bar).toHaveClass("h-1.5", "rounded-full");
+    }
+  });
+
+  it("el título usa el mismo estilo que los demás de la ficha (chico, en mayúsculas)", () => {
+    render(<ScentPyramid notes={notes} glow={glow} />);
+    const heading = screen.getByRole("heading", { level: 2, name: "Pirámide olfativa" });
+    expect(heading).toHaveClass("text-sm", "uppercase", "text-muted");
+    expect(heading).not.toHaveClass("font-serif");
+  });
+
   it("no dibuja nada sin notas", () => {
     const { container } = render(<ScentPyramid notes={null} glow={glow} />);
     expect(container).toBeEmptyDOMElement();

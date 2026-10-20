@@ -126,7 +126,8 @@ export function Header() {
             className="flex min-h-11 shrink-0 items-center gap-2 md:gap-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <Logo variant="mark" preload />
-            <span className="font-serif text-lg font-semibold tracking-[0.16em] md:text-xl md:tracking-[0.22em]">
+            {/* Bajo 360 px la palabra se achica: con los tres botones de 44 px la fila entra en 320 con su margen. */}
+            <span className="font-serif text-lg font-semibold tracking-[0.16em] max-[359px]:text-[15px] max-[359px]:tracking-[0.06em] md:text-xl md:tracking-[0.22em]">
               EL BARBUDO
             </span>
           </Link>
