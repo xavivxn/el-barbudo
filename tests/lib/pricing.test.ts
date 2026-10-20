@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardPricing } from "@/lib/pricing";
+import { cardPricing, splitPriceLabel } from "@/lib/pricing";
 import type { ProductDTO } from "@/lib/types";
 import { buildInquiryMessage, buildOrderMessage, whatsappUrl } from "@/lib/whatsapp";
 
@@ -67,5 +67,17 @@ describe("cardPricing", () => {
     expect(result.label).toBeNull();
     expect(result.orderVariant).toBeNull();
     expect(result.orderHref).toBe(whatsappUrl(buildInquiryMessage("Nada")));
+  });
+});
+
+describe("splitPriceLabel", () => {
+  it("separa \"Desde\" del monto", () => {
+    expect(splitPriceLabel("Desde ₲\u00a0450.000")).toEqual({ prefix: "Desde", amount: "₲\u00a0450.000" });
+  });
+  it("un monto solo (con espacio duro) no tiene prefijo", () => {
+    expect(splitPriceLabel("₲\u00a085.000")).toEqual({ prefix: null, amount: "₲\u00a085.000" });
+  });
+  it("sin etiqueta devuelve null", () => {
+    expect(splitPriceLabel(null)).toBeNull();
   });
 });

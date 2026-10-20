@@ -273,6 +273,11 @@ body {
   --spot-out: 6px;
   --spot-a: 12%;
   --spot-core: 5%;
+  /*
+   * Color del foco: --spot-color, el tono del producto que ProductCard escribe con una utilidad de
+   * Tailwind (capa utilities). No se declara acá un valor por defecto: esta regla está fuera de capa
+   * y le ganaría a la utilidad; el bronce queda como respaldo en cada gradiente.
+   */
 }
 
 .dark .card-spotlight {
@@ -297,12 +302,12 @@ body {
   background:
     radial-gradient(
       140px circle at var(--sx) var(--sy),
-      color-mix(in oklab, var(--accent) var(--spot-core), transparent),
+      color-mix(in oklab, var(--spot-color, var(--accent)) var(--spot-core), transparent),
       transparent 70%
     ),
     radial-gradient(
       360px circle at var(--sx) var(--sy),
-      color-mix(in oklab, var(--accent) var(--spot-a), transparent),
+      color-mix(in oklab, var(--spot-color, var(--accent)) var(--spot-a), transparent),
       transparent 45%
     ),
     color-mix(in oklab, var(--surface) 70%, transparent);
@@ -314,7 +319,7 @@ body {
   padding: 1px;
   background: radial-gradient(
     300px circle at var(--sx) var(--sy),
-    color-mix(in oklab, var(--accent) 90%, transparent),
+    color-mix(in oklab, var(--spot-color, var(--accent)) 90%, transparent),
     transparent 40%
   );
   -webkit-mask:
@@ -329,6 +334,22 @@ body {
   .card-spotlight:hover::after {
     opacity: 1;
   }
+}
+
+/*
+ * Las tarjetas de una grilla entran en cascada al montarse (ProductGrid pone --i en cada una), con
+ * tope en la 12.ª para que una lista larga no haga esperar. Con reduced-motion, instantáneo.
+ */
+@keyframes card-in {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+}
+
+.card-in {
+  animation: card-in 350ms ease-out both;
+  animation-delay: calc(min(var(--i, 0), 12) * 40ms);
 }
 
 /*

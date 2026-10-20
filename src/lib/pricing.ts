@@ -12,6 +12,16 @@ function priceLabel(product: ProductDTO, priced: VariantDTO[]): string | null {
 }
 
 /**
+ * "Desde ₲ 450.000" → prefijo "Desde" y monto; "₲ 85.000" es todo monto (lleva un espacio duro, por
+ * eso solo "Desde" cuenta como prefijo). Vitrina y tarjetas lo muestran como eyebrow + monto en serif.
+ */
+export function splitPriceLabel(label: string | null): { prefix: string | null; amount: string } | null {
+  if (!label) return null;
+  const match = /^(Desde)\s+(.+)$/.exec(label);
+  return match ? { prefix: match[1], amount: match[2] } : { prefix: null, amount: label };
+}
+
+/**
  * Precio y pedido de una tarjeta de producto (regla R10): el precio y el pedido salen de las
  * variantes con stock; agotado muestra el precio de todas y "Consultar".
  */

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { ProductCard } from "@/components/shop/ProductCard";
 import type { ProductDTO } from "@/lib/types";
 
@@ -21,8 +21,8 @@ export function ProductGrid({ products, empty, headingLevel }: ProductGridProps)
 
   return (
     <ul className={PRODUCT_GRID_CLASS}>
-      {products.map((product) => (
-        <li key={product.id}>
+      {products.map((product, index) => (
+        <li key={product.id} className="card-in" style={{ "--i": index } as CSSProperties}>
           <ProductCard product={product} headingLevel={headingLevel} />
         </li>
       ))}

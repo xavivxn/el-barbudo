@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import type { ImgHTMLAttributes } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProductCard } from "@/components/shop/ProductCard";
@@ -42,6 +42,7 @@ const perfumeTwoVariants = product({
   slug: "noche-de-cuero",
   name: "Noche de Cuero",
   subtitle: "Eau de parfum",
+  tags: ["amaderado", "fresco", "día"],
   variants: [
     { id: "v1", label: "50 ml", price: 450000, stock: 3 },
     { id: "v2", label: "100 ml", price: 650000, stock: 2 },
@@ -79,7 +80,9 @@ describe("ProductCard", () => {
   it("muestra 'Desde' con el precio más bajo y pide la variante más barata por WhatsApp", () => {
     render(<ProductCard product={perfumeTwoVariants} />);
 
-    expect(screen.getByText("Desde ₲ 450.000")).toBeInTheDocument();
+    // "Desde" como eyebrow y el monto aparte, en un mismo párrafo.
+    expect(screen.getByText("Desde")).toBeInTheDocument();
+    expect(screen.getByText("₲ 450.000")).toBeInTheDocument();
     const order = screen.getByRole("link", { name: /pedir .* por whatsapp/i });
     expect(order).toHaveAttribute("href", expect.stringContaining("wa.me"));
     expect(order).toHaveAttribute("target", "_blank");
@@ -117,7 +120,8 @@ describe("ProductCard", () => {
   it("si la variante más barata está agotada, muestra y pide la más barata con stock", () => {
     render(<ProductCard product={cheapestSoldOut} />);
 
-    expect(screen.getByText("Desde ₲ 650.000")).toBeInTheDocument();
+    expect(screen.getByText("Desde")).toBeInTheDocument();
+    expect(screen.getByText("₲ 650.000")).toBeInTheDocument();
     expect(screen.queryByText(/450\.000/)).not.toBeInTheDocument();
     const href = screen
       .getByRole("link", { name: /pedir ámbar nocturno por whatsapp/i })
@@ -127,12 +131,27 @@ describe("ProductCard", () => {
     expect(href).not.toContain(encodeURIComponent("(50 ml)"));
   });
 
-  it("agotado: etiqueta, sin botón de pedido y con consulta por WhatsApp", () => {
-    render(<ProductCard product={soldOutProduct} />);
+  it("muestra el estilo con las dos primeras etiquetas, en mayúscula inicial", () => {
+    render(<ProductCard product={perfumeTwoVariants} />);
+    expect(screen.getByText("Amaderado · Fresco")).toBeInTheDocument();
+    expect(screen.queryByText(/día/i)).not.toBeInTheDocument();
+  });
+
+  it("escribe el tono del producto para el foco del hover", () => {
+    const { container } = render(<ProductCard product={perfumeTwoVariants} />);
+    const card = container.querySelector("article") as HTMLElement;
+    expect(card.style.getPropertyValue("--spot-light")).toBe("#B9864F");
+    expect(card.style.getPropertyValue("--spot-dark")).toBe("#B07A44");
+  });
+
+  it("agotado: etiqueta, foto apagada, sin botón de pedido y consulta redonda por WhatsApp", () => {
+    const { container } = render(<ProductCard product={soldOutProduct} />);
 
     expect(screen.getByText("Agotado")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /pedir/i })).not.toBeInTheDocument();
-    const inquiry = screen.getByRole("link", { name: /consultar/i });
+    expect(within(container.querySelector("article") as HTMLElement).getByText("Consultar")).toBeInTheDocument();
+    const inquiry = screen.getByRole("link", { name: "Consultar disponibilidad de Oud Reserva por WhatsApp" });
+    expect(inquiry).toHaveClass("h-11", "w-11");
     expect(inquiry.getAttribute("href")).toContain(encodeURIComponent("¿tienen disponible"));
     expect(decodedHref(inquiry)).toContain("¿tienen disponible Oud Reserva?");
     // Sin fotos (`images: []`): placeholder neutro dentro del enlace de imagen (aria-hidden).

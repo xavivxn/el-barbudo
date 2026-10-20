@@ -25,7 +25,7 @@ import { useDocumentHidden } from "@/lib/hooks/useDocumentHidden";
 import { useHydrated } from "@/lib/hooks/useHydrated";
 import { usePrefersReducedMotion } from "@/lib/hooks/usePrefersReducedMotion";
 import { useProductMorph } from "@/lib/hooks/useProductMorph";
-import { cardPricing } from "@/lib/pricing";
+import { cardPricing, splitPriceLabel } from "@/lib/pricing";
 import { wrapIndex } from "@/lib/showcase";
 import { toneFor } from "@/lib/tone";
 import type { ProductDTO } from "@/lib/types";
@@ -369,21 +369,13 @@ type SlideProps = {
   reducedMotion: boolean;
 };
 
-/** "Desde ₲ 450.000" → prefijo "Desde" y monto; sin prefijo, solo el monto. */
-function splitPrice(label: string | null): { prefix: string | null; amount: string } | null {
-  if (!label) return null;
-  // Solo "Desde" es prefijo: "₲ 85.000" lleva un espacio duro y es todo monto.
-  const match = /^(Desde)\s+(.+)$/.exec(label);
-  return match ? { prefix: match[1], amount: match[2] } : { prefix: null, amount: label };
-}
-
 /** Inclinación máxima del marco hacia el mouse, en grados (eje X / eje Y). */
 const TILT_X = 8;
 const TILT_Y = 10;
 
 function Slide({ ref, product, index, count, active, inert, live, entrance, parallaxY, reducedMotion }: SlideProps) {
   const { soldOut, label, orderHref } = cardPricing(product);
-  const price = splitPrice(label);
+  const price = splitPriceLabel(label);
   const { glow } = toneFor(product);
   const frameRef = useRef<HTMLDivElement>(null);
   // La foto enmarcada vuela a la ficha con "Ver producto".

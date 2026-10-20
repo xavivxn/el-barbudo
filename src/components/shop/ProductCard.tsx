@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { ViewTransition } from "react";
+import { type CSSProperties, ViewTransition } from "react";
 import { focusRing } from "@/components/ui/focus";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { usePointerVars } from "@/lib/hooks/usePointerVars";
 import { useProductMorph } from "@/lib/hooks/useProductMorph";
-import { cardPricing } from "@/lib/pricing";
+import { cardPricing, splitPriceLabel } from "@/lib/pricing";
+import { toneFor } from "@/lib/tone";
 import type { ProductDTO } from "@/lib/types";
 
 /** Grilla de 2/3/4 columnas: catálogo y pestañas de la portada. */
@@ -21,17 +22,30 @@ type ProductCardProps = {
   sizes?: string;
 };
 
+/** "amaderado, fresco, día" → "Amaderado · Fresco": el estilo, para elegir sin abrir la ficha. */
+function styleLine(tags: string[]): string | null {
+  const shown = tags.slice(0, 2).map((tag) => tag.charAt(0).toUpperCase() + tag.slice(1));
+  return shown.length > 0 ? shown.join(" · ") : null;
+}
+
+const roundCta = `inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-[filter,background-color,color] duration-200 ${focusRing}`;
+
 export function ProductCard({ product, headingLevel = 3, sizes = GRID_SIZES }: ProductCardProps) {
   const Heading = headingLevel === 2 ? "h2" : "h3";
   const href = `/productos/${product.slug}`;
   const { onPointerMove } = usePointerVars<HTMLElement>();
   const morph = useProductMorph(product.slug);
-  const { soldOut, label: price, orderHref, orderVariant: cheapest } = cardPricing(product);
+  const { soldOut, label, orderHref, orderVariant: cheapest } = cardPricing(product);
+  const price = splitPriceLabel(label);
+  const style = styleLine(product.tags);
+  // El foco del hover toma el color del tono del producto (ver .card-spotlight en globals).
+  const { glow } = toneFor(product);
 
   return (
     <article
       onPointerMove={onPointerMove}
-      className="card-spotlight group relative isolate flex h-full flex-col transition-transform duration-200 hover:-translate-y-0.5"
+      style={{ "--spot-light": glow.light, "--spot-dark": glow.dark } as CSSProperties}
+      className="card-spotlight group relative isolate flex h-full flex-col transition-transform duration-200 [--spot-color:var(--spot-light)] hover:-translate-y-0.5 dark:[--spot-color:var(--spot-dark)]"
     >
       <div className="relative">
         {/*
@@ -52,7 +66,7 @@ export function ProductCard({ product, headingLevel = 3, sizes = GRID_SIZES }: P
               fill
               sizes={sizes}
               className={`object-cover transition-transform duration-300 group-hover:scale-105 ${
-                soldOut ? "opacity-50" : ""
+                soldOut ? "opacity-60 grayscale" : ""
               }`}
             />
           </Link>
@@ -75,13 +89,22 @@ export function ProductCard({ product, headingLevel = 3, sizes = GRID_SIZES }: P
           </Link>
         </Heading>
         {product.subtitle ? <p className="mt-1 text-muted">{product.subtitle}</p> : null}
+        {style ? <p className="mt-0.5 text-sm text-muted">{style}</p> : null}
 
-        <div
-          className={`mt-auto flex items-center justify-between gap-x-3 gap-y-2 pt-3 ${
-            cheapest ? "" : "flex-wrap"
-          }`}
-        >
-          {price ? <p className="min-w-0 tabular-nums">{price}</p> : null}
+        {/* Precio como en la vitrina: eyebrow arriba, monto en serif; nunca se parte al lado del botón. */}
+        <div className="mt-auto flex items-end justify-between gap-3 pt-3">
+          {price ? (
+            <p className="min-w-0">
+              <span className="block text-xs font-medium tracking-[0.16em] text-muted uppercase">
+                {soldOut ? "Consultar" : (price.prefix ?? " ")}
+              </span>
+              <span className="block font-serif text-xl leading-tight font-medium tabular-nums md:text-2xl">
+                {price.amount}
+              </span>
+            </p>
+          ) : (
+            <span />
+          )}
 
           {cheapest ? (
             <a
@@ -89,7 +112,7 @@ export function ProductCard({ product, headingLevel = 3, sizes = GRID_SIZES }: P
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Pedir ${product.name} por WhatsApp`}
-              className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-[#141414] transition-[filter] duration-200 hover:brightness-110 ${focusRing}`}
+              className={`${roundCta} bg-accent text-[#141414] hover:brightness-110`}
             >
               <WhatsAppIcon />
             </a>
@@ -98,11 +121,10 @@ export function ProductCard({ product, headingLevel = 3, sizes = GRID_SIZES }: P
               href={orderHref}
               target="_blank"
               rel="noopener noreferrer"
-              className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-fg px-4 text-sm font-medium transition-colors duration-200 hover:bg-fg hover:text-bg ${focusRing}`}
+              aria-label={`Consultar disponibilidad de ${product.name} por WhatsApp`}
+              className={`${roundCta} border border-fg text-fg hover:bg-fg hover:text-bg`}
             >
-              <WhatsAppIcon className="h-4 w-4" />
-              Consultar
-              <span className="sr-only"> disponibilidad de {product.name} por WhatsApp</span>
+              <WhatsAppIcon />
             </a>
           )}
         </div>
