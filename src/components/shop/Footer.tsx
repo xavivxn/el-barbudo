@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/Button";
+import { FooterWordmark } from "@/components/shop/FooterWordmark";
 import { Logo } from "@/components/ui/Logo";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { whatsappUrl } from "@/lib/whatsapp";
@@ -63,6 +64,10 @@ export function Footer() {
             ))}
           </dl>
         </div>
+      </div>
+
+      <div className="mx-auto max-w-6xl px-4 pb-10 md:px-8">
+        <FooterWordmark />
       </div>
 
       <div className="border-t border-line">

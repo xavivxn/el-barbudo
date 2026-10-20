@@ -317,3 +317,114 @@ body {
     animation-delay: 0s !important;
   }
 }
+
+/*
+ * Tipografía gigante del pie (FooterWordmark): "EL BARBUDO" a todo el ancho, en contorno, y una
+ * copia rellena de bronce que aparece donde pasa el cursor (mouse) o sube con el scroll (touch).
+ * El tamaño sale del ancho del contenedor (cqw), así nunca desborda; un `vw` queda de respaldo.
+ * Decorativo: el contorno usa --muted atenuado (≥3:1 contra el fondo en ambos temas).
+ * Sin JS solo se ve el contorno: la máscara arranca fuera de la caja y la capa de scroll, abajo.
+ */
+.wordmark {
+  --mx: -9999px;
+  --my: -9999px;
+  --wm-stroke: color-mix(in oklab, var(--muted) 80%, transparent);
+  --wm-glow: transparent;
+  container-type: inline-size;
+  position: relative;
+  user-select: none;
+  font-family: var(--font-cormorant), Georgia, serif;
+  font-weight: 600;
+}
+
+.dark .wordmark {
+  --wm-stroke: color-mix(in oklab, var(--muted) 72%, transparent);
+  --wm-glow: color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+.wordmark__line,
+.wordmark__fill,
+.wordmark__wipe {
+  font-size: min(13vw, 10.5rem);
+  font-size: 16cqw;
+  line-height: 0.8;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.wordmark__line {
+  display: block;
+  padding-block: 0.06em;
+  text-align: center;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--wm-stroke);
+}
+
+.wordmark__track {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  bottom: -6rem;
+  pointer-events: none;
+}
+
+.wordmark__fill {
+  position: absolute;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+}
+
+.wordmark__wipe {
+  position: absolute;
+  inset: 0;
+}
+
+.wordmark__text {
+  display: block;
+  padding-block: 0.06em;
+  text-align: center;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--accent) 70%, white),
+    var(--accent) 55%,
+    color-mix(in oklab, var(--accent) 70%, black)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* El brillo solo en la capa del mouse: sobre la que sube con transform, el filtro pinta un recuadro. */
+.wordmark__fill--hover .wordmark__text {
+  filter: drop-shadow(0 0 18px var(--wm-glow));
+}
+
+/* Reduced motion: relleno suave, estático. */
+.wordmark__fill--static {
+  display: block;
+  opacity: 0.35;
+}
+
+/* Mouse: el relleno se ve solo bajo el cursor (la máscara sigue --mx/--my). */
+@media (hover: hover) and (pointer: fine) {
+  .wordmark__fill--hover {
+    display: block;
+    opacity: 0;
+    transition: opacity 400ms ease-out;
+    -webkit-mask: radial-gradient(circle 240px at var(--mx) var(--my), #000 20%, transparent 72%);
+    mask: radial-gradient(circle 240px at var(--mx) var(--my), #000 20%, transparent 72%);
+  }
+
+  .wordmark:hover .wordmark__fill--hover {
+    opacity: 1;
+  }
+}
+
+/* Touch o sin hover: el relleno sube con el scroll (la capa recorta; motion le pone el transform). */
+@media not ((hover: hover) and (pointer: fine)) {
+  .wordmark__fill--scroll {
+    display: block;
+    overflow: hidden;
+  }
+}
