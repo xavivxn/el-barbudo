@@ -53,7 +53,9 @@ function stagger(i: number): CSSProperties {
   return { "--i": i } as CSSProperties;
 }
 
+/** Progreso del destacado activo: corriendo, lleno (rotación detenida) o vacío (inactivo). */
 type Progress = "running" | "full" | "empty";
+/** Barra de progreso (móvil). En desktop el mismo estado lo muestra el anillo de la miniatura. */
 const PROGRESS_CLASS: Record<Progress, string> = {
   running: "animate-showcase-progress",
   full: "scale-x-100",
@@ -84,6 +86,10 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
   // Si la lista se achica, la activa queda dentro del rango.
   const active = Math.min(activeState, count - 1);
   const [paused, setPaused] = useState(false);
+  // Cuántas veces entró cada diapositiva por navegación (toque, flecha, teclado o auto-avance): la
+  // columna de texto se vuelve a montar y su cascada arranca. Un swipe no la cambia: la diapositiva
+  // ya estaba a la vista y el texto no debe parpadear.
+  const [entrances, setEntrances] = useState<number[]>([]);
   const [hovered, setHovered] = useState(false);
   const [focusedWithin, setFocusedWithin] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
@@ -142,6 +148,11 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
   function goTo(target: number, { moveFocus = false } = {}) {
     const next = wrapIndex(target, count);
     scrollTrack(next);
+    setEntrances((prev) => {
+      const nextEntrances = prev.slice();
+      nextEntrances[next] = (prev[next] ?? 0) + 1;
+      return nextEntrances;
+    });
     if (!moveFocus) {
       setActive(next);
       return;
@@ -264,10 +275,8 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
         // En desktop la pista recorta en vertical (overflow-x crea un contenedor de scroll) y el
         // resplandor de la foto se pasaba por abajo: `md:pb-16` le da aire, y la fila de controles
         // sube lo mismo (`md:-mt-16`) para que el alto total no cambie.
-        // En móvil las diapositivas miden 88 % y el riel lleva 6 % de aire a cada lado: la vecina asoma
-        // por el borde y se entiende que se desliza. `relative`: offsetLeft de cada diapositiva es
-        // respecto del riel (ver slideLeft).
-        className="relative flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-[6%] [scrollbar-width:none] md:gap-0 md:px-0 md:pb-16 [&::-webkit-scrollbar]:hidden"
+        // `relative`: offsetLeft de cada diapositiva es respecto del riel (ver slideLeft).
+        className="relative flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] md:pb-16 [&::-webkit-scrollbar]:hidden"
       >
         {products.map((product, index) => (
           <Slide
@@ -281,6 +290,7 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
             active={index === active}
             inert={hydrated && index !== active}
             live={inView && !hidden}
+            entrance={entrances[index] ?? 0}
             parallaxY={reducedMotion ? undefined : parallaxY}
             reducedMotion={reducedMotion}
           />
@@ -289,7 +299,7 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
 
       {count > 1 ? (
         <div className="relative z-10 flex items-center gap-3 px-4 pb-3 md:-mt-16 md:px-12 md:pb-5">
-          <div className="flex flex-1 items-center gap-2">
+          <div className="flex flex-1 items-center gap-2 md:gap-3">
             {products.map((product, index) => {
               const current = index === active;
               const progress: Progress = current ? (playing ? "running" : "full") : "empty";
@@ -302,7 +312,8 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
                   aria-label={`Ir a ${product.name}`}
                   aria-current={current ? "true" : undefined}
                   onClick={() => goTo(index)}
-                  // Móvil: barra de progreso. Desktop: miniatura redonda de 44 px con anillo de progreso.
+                  // Móvil: barra de progreso, como siempre. Desktop: miniatura redonda de 44 px con anillo
+                  // de progreso, así se ve qué productos vienen.
                   className={`group/bar relative h-11 min-w-6 flex-1 cursor-pointer md:w-11 md:flex-none md:rounded-full ${focusRing}`}
                 >
                   <span className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 overflow-hidden rounded-full bg-fg/15 transition-colors duration-200 group-hover/bar:bg-fg/35 md:hidden">
@@ -315,7 +326,7 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
                   <span
                     key={`thumb-${runKey}`}
                     data-progress={progress}
-                    className={`showcase-ring absolute inset-0 hidden overflow-visible rounded-full transition-opacity duration-200 md:block ${
+                    className={`showcase-ring absolute inset-0 hidden rounded-full transition-opacity duration-200 md:block ${
                       current ? "opacity-100" : "opacity-60 group-hover/bar:opacity-100"
                     }`}
                   >
@@ -352,6 +363,8 @@ type SlideProps = {
   inert: boolean;
   /** La vitrina está en pantalla y la pestaña visible: el borde de luz de la activa gira. */
   live: boolean;
+  /** Sube con cada entrada por navegación: vuelve a montar la columna de texto y su cascada. */
+  entrance: number;
   parallaxY: MotionValue<number> | undefined;
   reducedMotion: boolean;
 };
@@ -368,7 +381,7 @@ function splitPrice(label: string | null): { prefix: string | null; amount: stri
 const TILT_X = 8;
 const TILT_Y = 10;
 
-function Slide({ ref, product, index, count, active, inert, live, parallaxY, reducedMotion }: SlideProps) {
+function Slide({ ref, product, index, count, active, inert, live, entrance, parallaxY, reducedMotion }: SlideProps) {
   const { soldOut, label, orderHref } = cardPricing(product);
   const price = splitPrice(label);
   const { glow } = toneFor(product);
@@ -410,20 +423,16 @@ function Slide({ ref, product, index, count, active, inert, live, parallaxY, red
       inert={inert}
       tabIndex={-1}
       // `relative`: los `sr-only` (absolutos) de la diapositiva quedan dentro de ella y no estiran el riel.
-      // En móvil la vecina que asoma va atenuada: se lee como "hay más" sin competir con la activa.
-      className={`relative grid min-h-[70svh] w-[88%] shrink-0 snap-center grid-rows-[auto_1fr] transition-opacity duration-400 ease-out focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:h-[520px] md:min-h-0 md:w-full md:grid-cols-2 md:grid-rows-1 ${
-        active ? "" : "max-md:opacity-40"
-      }`}
+      className="relative grid min-h-[70svh] w-full shrink-0 snap-center grid-rows-[auto_1fr] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:h-[520px] md:min-h-0 md:grid-cols-2 md:grid-rows-1"
     >
       <div
-        data-active={active ? "true" : undefined}
+        key={entrance}
         className="showcase-copy @container flex min-w-0 flex-col px-4 pt-4 pb-5 md:justify-center md:py-10 md:pr-6 md:pl-12 lg:pl-16"
       >
         <p style={stagger(0)} className="text-xs font-medium tracking-[0.2em] text-muted uppercase">
           Destacado
           {count > 1 ? (
-            // En móvil la vecina asoma por el borde y ya dice que hay más: el contador va solo en desktop.
-            <span aria-hidden="true" className="hidden tabular-nums md:inline">
+            <span aria-hidden="true" className="tabular-nums">
               {" · "}
               {index + 1}/{count}
             </span>

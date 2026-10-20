@@ -42,7 +42,7 @@
 
 @theme {
   --animate-page-in: page-in 200ms ease-out;
-  /* Barra de la vitrina: dura lo mismo que el intervalo de auto-avance (Showcase). */
+  /* Barra de la vitrina (móvil): dura lo mismo que el intervalo de auto-avance (Showcase). */
   --animate-showcase-progress: showcase-progress 6s linear both;
 
   @keyframes page-in {
@@ -240,8 +240,8 @@ body {
 
 /*
  * El texto entra con cada destacado: eyebrow, nombre, etiquetas, nota, precio y botones suben 10 px
- * y aparecen en cascada (45 ms entre uno y otro) cuando la diapositiva pasa a activa. La animación
- * arranca cada vez que la regla vuelve a aplicar (data-active), sin volver a montar nada. Con
+ * y aparecen en cascada (45 ms entre uno y otro) al montarse la columna. Showcase la vuelve a montar
+ * solo en las entradas por navegación (no en un swipe, donde el texto ya estaba a la vista). Con
  * reduced-motion la regla global la deja instantánea.
  */
 @keyframes showcase-text-in {
@@ -251,7 +251,7 @@ body {
   }
 }
 
-.showcase-copy[data-active="true"] > * {
+.showcase-copy > * {
   animation: showcase-text-in 400ms ease-out both;
   animation-delay: calc(var(--i, 0) * 45ms);
 }
