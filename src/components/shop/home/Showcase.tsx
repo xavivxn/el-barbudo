@@ -45,6 +45,13 @@ const IMAGE_SIZES = "(min-width: 1024px) 336px, (min-width: 768px) 272px, 60vw";
 // En móvil los dos CTA comparten una fila de ~150 px cada uno: menos padding que el `md` del Button
 // (con `!`, porque la clase de tamaño del Button gana por orden en el CSS).
 const ctaFit = "gap-1.5! px-3! whitespace-nowrap md:gap-2! md:px-5! lg:px-7!";
+// Al presionar, el botón cede apenas (sin mover el layout: es un transform).
+const ctaPress = "[transition-property:background-color,color,opacity,filter,transform] active:scale-[0.98]";
+
+/** Orden de entrada de cada bloque de texto (ver .showcase-copy en globals.css). */
+function stagger(i: number): CSSProperties {
+  return { "--i": i } as CSSProperties;
+}
 
 type Progress = "running" | "full" | "empty";
 const PROGRESS_CLASS: Record<Progress, string> = {
@@ -93,11 +100,20 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
   const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start end", "end start"] });
   const parallaxY = useTransform(scrollYProgress, [0, 1], [PARALLAX_PX, -PARALLAX_PX]);
 
+  /** Desplazamiento del riel que centra la diapositiva `index` (en móvil la vecina asoma a los lados). */
+  function slideLeft(index: number) {
+    const track = trackRef.current;
+    const slide = slideRefs.current[index];
+    if (!track) return 0;
+    if (!slide) return index * track.clientWidth;
+    return slide.offsetLeft - (track.clientWidth - slide.clientWidth) / 2;
+  }
+
   function scrollTrack(next: number) {
     const track = trackRef.current;
     if (!track) return;
     window.clearTimeout(jumpTimer.current);
-    const left = next * track.clientWidth;
+    const left = slideLeft(next);
     // Un salto (incluida la vuelta de la última a la primera) no recorre todas las diapositivas:
     // corta con un fundido breve del riel. Entre vecinas, desplazamiento suave.
     const jump = Math.abs(next - active) > 1;
@@ -161,7 +177,19 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
     settleTimer.current = window.setTimeout(() => {
       const track = trackRef.current;
       if (!track || track.clientWidth === 0) return;
-      setActive(wrapIndex(Math.round(track.scrollLeft / track.clientWidth), count));
+      // La activa es la diapositiva cuyo centro queda más cerca del centro del riel.
+      const center = track.scrollLeft + track.clientWidth / 2;
+      let nearest = 0;
+      let distance = Number.POSITIVE_INFINITY;
+      slideRefs.current.forEach((slide, index) => {
+        if (!slide) return;
+        const d = Math.abs(slide.offsetLeft + slide.clientWidth / 2 - center);
+        if (d < distance) {
+          distance = d;
+          nearest = index;
+        }
+      });
+      setActive(wrapIndex(nearest, count));
     }, SCROLL_SETTLE_MS);
   }
 
@@ -195,6 +223,9 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
     }
   }
 
+  // Ambiente por tono: la sección se tiñe con el color del destacado activo (ver .showcase-ambient).
+  const { glow } = toneFor(products[active]);
+
   return (
     <section
       ref={sectionRef}
@@ -205,9 +236,10 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
       onBlur={onBlur}
       onPointerEnter={(event) => event.pointerType === "mouse" && setHovered(true)}
       onPointerLeave={(event) => event.pointerType === "mouse" && setHovered(false)}
+      style={{ "--glow-light": glow.light, "--glow-dark": glow.dark } as CSSProperties}
       // `overflow-clip` y no `overflow-hidden`: recorta igual (esquinas incluidas) pero no es una caja
       // desplazable, así un `scrollIntoView` o un foco no la corren de lado.
-      className="relative isolate overflow-clip rounded-2xl border border-line bg-surface md:rounded-3xl"
+      className="group/vitrina showcase-ambient relative isolate overflow-clip rounded-2xl border border-line [--glow:var(--glow-light)] md:rounded-3xl dark:[--glow:var(--glow-dark)]"
     >
       {/*
         Control de rotación: primero en el orden de foco y de lectura (patrón WAI-ARIA). Va arriba a
@@ -232,7 +264,10 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
         // En desktop la pista recorta en vertical (overflow-x crea un contenedor de scroll) y el
         // resplandor de la foto se pasaba por abajo: `md:pb-16` le da aire, y la fila de controles
         // sube lo mismo (`md:-mt-16`) para que el alto total no cambie.
-        className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] md:pb-16 [&::-webkit-scrollbar]:hidden"
+        // En móvil las diapositivas miden 88 % y el riel lleva 6 % de aire a cada lado: la vecina asoma
+        // por el borde y se entiende que se desliza. `relative`: offsetLeft de cada diapositiva es
+        // respecto del riel (ver slideLeft).
+        className="relative flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-[6%] [scrollbar-width:none] md:gap-0 md:px-0 md:pb-16 [&::-webkit-scrollbar]:hidden"
       >
         {products.map((product, index) => (
           <Slide
@@ -258,22 +293,35 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
             {products.map((product, index) => {
               const current = index === active;
               const progress: Progress = current ? (playing ? "running" : "full") : "empty";
+              // Una animación nueva por cada vuelta: al cambiar de diapositiva o al reanudar arranca de cero.
+              const runKey = progress === "running" ? `run-${active}` : progress;
               return (
                 <button
                   key={product.id}
                   type="button"
-                  aria-label={`Ir al destacado ${index + 1}`}
+                  aria-label={`Ir a ${product.name}`}
                   aria-current={current ? "true" : undefined}
                   onClick={() => goTo(index)}
-                  className={`group/bar relative h-11 min-w-6 flex-1 cursor-pointer md:max-w-20 ${focusRing}`}
+                  // Móvil: barra de progreso. Desktop: miniatura redonda de 44 px con anillo de progreso.
+                  className={`group/bar relative h-11 min-w-6 flex-1 cursor-pointer md:w-11 md:flex-none md:rounded-full ${focusRing}`}
                 >
-                  <span className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 overflow-hidden rounded-full bg-fg/15 transition-colors duration-200 group-hover/bar:bg-fg/35">
+                  <span className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 overflow-hidden rounded-full bg-fg/15 transition-colors duration-200 group-hover/bar:bg-fg/35 md:hidden">
                     <span
-                      // Una animación nueva por cada vuelta: al cambiar de diapositiva o al reanudar arranca de cero.
-                      key={progress === "running" ? `run-${active}` : progress}
+                      key={runKey}
                       data-progress={progress}
                       className={`block h-full origin-left bg-fg ${PROGRESS_CLASS[progress]}`}
                     />
+                  </span>
+                  <span
+                    key={`thumb-${runKey}`}
+                    data-progress={progress}
+                    className={`showcase-ring absolute inset-0 hidden overflow-visible rounded-full transition-opacity duration-200 md:block ${
+                      current ? "opacity-100" : "opacity-60 group-hover/bar:opacity-100"
+                    }`}
+                  >
+                    <span className="absolute inset-0 overflow-hidden rounded-full border border-line bg-surface">
+                      <SafeImage src={product.images[0]} alt="" fill sizes="44px" className="object-cover" />
+                    </span>
                   </span>
                 </button>
               );
@@ -281,7 +329,7 @@ function ShowcaseCarousel({ products }: ShowcaseProps) {
           </div>
 
           {/* Solo escritorio: en móvil se desliza con el dedo o se usan las barras. */}
-          <div className="hidden gap-3 md:flex">
+          <div className="hidden gap-3 opacity-70 transition-opacity duration-200 group-focus-within/vitrina:opacity-100 group-hover/vitrina:opacity-100 md:flex">
             <IconButton label="Destacado anterior" aria-controls={trackId} onClick={() => goTo(active - 1)}>
               <ArrowLeft size={18} aria-hidden="true" />
             </IconButton>
@@ -308,12 +356,21 @@ type SlideProps = {
   reducedMotion: boolean;
 };
 
+/** "Desde ₲ 450.000" → prefijo "Desde" y monto; sin prefijo, solo el monto. */
+function splitPrice(label: string | null): { prefix: string | null; amount: string } | null {
+  if (!label) return null;
+  // Solo "Desde" es prefijo: "₲ 85.000" lleva un espacio duro y es todo monto.
+  const match = /^(Desde)\s+(.+)$/.exec(label);
+  return match ? { prefix: match[1], amount: match[2] } : { prefix: null, amount: label };
+}
+
 /** Inclinación máxima del marco hacia el mouse, en grados (eje X / eje Y). */
 const TILT_X = 8;
 const TILT_Y = 10;
 
 function Slide({ ref, product, index, count, active, inert, live, parallaxY, reducedMotion }: SlideProps) {
-  const { soldOut, label: price, orderHref } = cardPricing(product);
+  const { soldOut, label, orderHref } = cardPricing(product);
+  const price = splitPrice(label);
   const { glow } = toneFor(product);
   const frameRef = useRef<HTMLDivElement>(null);
   // La foto enmarcada vuela a la ficha con "Ver producto".
@@ -353,24 +410,39 @@ function Slide({ ref, product, index, count, active, inert, live, parallaxY, red
       inert={inert}
       tabIndex={-1}
       // `relative`: los `sr-only` (absolutos) de la diapositiva quedan dentro de ella y no estiran el riel.
-      className="relative grid min-h-[70svh] w-full shrink-0 snap-center grid-rows-[auto_1fr] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:h-[520px] md:min-h-0 md:grid-cols-2 md:grid-rows-1"
+      // En móvil la vecina que asoma va atenuada: se lee como "hay más" sin competir con la activa.
+      className={`relative grid min-h-[70svh] w-[88%] shrink-0 snap-center grid-rows-[auto_1fr] transition-opacity duration-400 ease-out focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:h-[520px] md:min-h-0 md:w-full md:grid-cols-2 md:grid-rows-1 ${
+        active ? "" : "max-md:opacity-40"
+      }`}
     >
-      <div className="@container flex min-w-0 flex-col px-4 pt-4 pb-5 md:justify-center md:py-10 md:pr-6 md:pl-12 lg:pl-16">
-        <p className="text-xs font-medium tracking-[0.2em] text-muted uppercase">
+      <div
+        data-active={active ? "true" : undefined}
+        className="showcase-copy @container flex min-w-0 flex-col px-4 pt-4 pb-5 md:justify-center md:py-10 md:pr-6 md:pl-12 lg:pl-16"
+      >
+        <p style={stagger(0)} className="text-xs font-medium tracking-[0.2em] text-muted uppercase">
           Destacado
           {count > 1 ? (
-            <span aria-hidden="true" className="tabular-nums">
+            // En móvil la vecina asoma por el borde y ya dice que hay más: el contador va solo en desktop.
+            <span aria-hidden="true" className="hidden tabular-nums md:inline">
               {" · "}
               {index + 1}/{count}
             </span>
           ) : null}
         </p>
-        <h2 className="mt-2 font-serif text-[32px] leading-[1.05] font-medium text-balance md:mt-3 md:text-[44px] lg:text-[56px]">
+        <h2
+          style={stagger(1)}
+          className="mt-2 font-serif text-[32px] leading-[1.05] font-medium text-balance md:mt-3 md:text-[44px] lg:text-[56px]"
+        >
           {product.name}
         </h2>
+        {product.subtitle ? (
+          <p style={stagger(2)} className="mt-1.5 text-sm text-muted md:mt-2">
+            {product.subtitle}
+          </p>
+        ) : null}
 
         {tags.length > 0 ? (
-          <ul className="mt-3 flex flex-wrap gap-2 md:mt-4" aria-label="Estilo">
+          <ul style={stagger(3)} className="mt-3 flex flex-wrap gap-2 md:mt-4" aria-label="Estilo">
             {tags.map((tag) => (
               <li
                 key={tag}
@@ -382,10 +454,22 @@ function Slide({ ref, product, index, count, active, inert, live, parallaxY, red
           </ul>
         ) : null}
 
-        {line ? <p className="mt-3 line-clamp-2 max-w-md text-muted md:mt-4">{line}</p> : null}
+        {line ? (
+          <p style={stagger(4)} className="mt-3 line-clamp-2 max-w-md text-muted md:mt-4">
+            {line}
+          </p>
+        ) : null}
 
-        <div className="mt-4 flex items-center gap-3 md:mt-6">
-          {price ? <p className="text-xl font-medium tabular-nums">{price}</p> : null}
+        <div style={stagger(5)} className="mt-4 flex items-center gap-3 md:mt-6">
+          {price ? (
+            // El número manda, en serif; "Desde" queda chico en sans.
+            <p className="font-serif text-[26px] leading-none font-medium tabular-nums md:text-[32px]">
+              {price.prefix ? (
+                <span className="mr-1 font-sans text-sm font-normal text-muted">{price.prefix} </span>
+              ) : null}
+              {price.amount}
+            </p>
+          ) : null}
           {soldOut ? (
             <span className="rounded-full bg-fg px-3 py-1 text-xs font-medium tracking-[0.16em] text-bg uppercase">
               Agotado
@@ -395,6 +479,7 @@ function Slide({ ref, product, index, count, active, inert, live, parallaxY, red
 
         {/* Los dos CTA comparten fila si entran (~150 px c/u); en pantallas más angostas se apilan. */}
         <div
+          style={stagger(6)}
           className={`mt-auto grid grid-cols-1 gap-2 pt-5 md:mt-8 md:flex md:flex-wrap md:pt-0 ${
             soldOut ? "" : "@min-[19rem]:grid-cols-2"
           }`}
@@ -404,7 +489,7 @@ function Slide({ ref, product, index, count, active, inert, live, parallaxY, red
             href={orderHref}
             target="_blank"
             rel="noopener noreferrer"
-            className={ctaFit}
+            className={`${ctaFit} ${ctaPress}`}
           >
             <WhatsAppIcon />
             {soldOut ? "Consultar disponibilidad" : "Pedir ahora"}
@@ -414,9 +499,14 @@ function Slide({ ref, product, index, count, active, inert, live, parallaxY, red
             variant="secondary"
             href={`/productos/${product.slug}`}
             {...morph.handlers}
-            className={ctaFit}
+            className={`group/cta ${ctaFit} ${ctaPress}`}
           >
             Ver producto
+            <ArrowRight
+              size={16}
+              aria-hidden="true"
+              className="transition-transform duration-200 group-hover/cta:translate-x-0.5"
+            />
           </Button>
         </div>
       </div>

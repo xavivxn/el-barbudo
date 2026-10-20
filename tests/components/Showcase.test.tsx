@@ -122,27 +122,27 @@ describe("Showcase", () => {
     expect(slides[0]).toHaveAttribute("aria-roledescription", "diapositiva");
     expect(screen.getByRole("group", { name: "1 de 3" })).not.toHaveAttribute("inert");
     expect(screen.getByRole("group", { name: "2 de 3" })).toHaveAttribute("inert");
-    expect(screen.getByRole("button", { name: "Ir al destacado 1" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("button", { name: "Ir a Noche de Cuero" })).toHaveAttribute("aria-current", "true");
 
     await user.click(screen.getByRole("button", { name: "Destacado siguiente" }));
-    expect(screen.getByRole("button", { name: "Ir al destacado 2" })).toHaveAttribute("aria-current", "true");
-    expect(screen.getByRole("button", { name: "Ir al destacado 1" })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("button", { name: "Ir a Bleu" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("button", { name: "Ir a Noche de Cuero" })).not.toHaveAttribute("aria-current");
     expect(screen.getByRole("group", { name: "2 de 3" })).not.toHaveAttribute("inert");
     expect(screen.getByRole("group", { name: "1 de 3" })).toHaveAttribute("inert");
     expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: "smooth" }));
 
     // El foco quedó en "Siguiente", dentro de la región.
     await user.keyboard("{ArrowLeft}");
-    expect(screen.getByRole("button", { name: "Ir al destacado 1" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("button", { name: "Ir a Noche de Cuero" })).toHaveAttribute("aria-current", "true");
     // Alt + flecha es del navegador (atrás/adelante): no mueve la vitrina.
     await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
-    expect(screen.getByRole("button", { name: "Ir al destacado 1" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("button", { name: "Ir a Noche de Cuero" })).toHaveAttribute("aria-current", "true");
 
     // Circular: desde la primera, "Destacado anterior" va a la última.
     await user.click(screen.getByRole("button", { name: "Destacado anterior" }));
-    expect(screen.getByRole("button", { name: "Ir al destacado 3" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("button", { name: "Ir a Aceite de barba" })).toHaveAttribute("aria-current", "true");
 
-    await user.click(screen.getByRole("button", { name: "Ir al destacado 2" }));
+    await user.click(screen.getByRole("button", { name: "Ir a Bleu" }));
     expect(activeSlide()).toHaveAccessibleName("2 de 3");
   });
 
@@ -176,7 +176,10 @@ describe("Showcase", () => {
     expect(within(slide).getByText("fresco")).toBeInTheDocument();
     expect(within(slide).queryByText("día")).not.toBeInTheDocument();
     expect(within(slide).getByText("Salida: Pomelo, limón, menta")).toBeInTheDocument();
-    expect(within(slide).getByText("Desde ₲ 450.000")).toBeInTheDocument();
+    // "Desde" chico y el monto en serif, en un mismo párrafo.
+    expect(
+      within(slide).getByText((_, element) => element?.tagName === "P" && element.textContent?.replace(/\s+/g, " ") === "Desde ₲ 450.000"),
+    ).toBeInTheDocument();
 
     const order = within(slide).getByRole("link", { name: /pedir ahora/i });
     expect(order).toHaveAttribute("href", expect.stringContaining("wa.me"));
@@ -217,11 +220,17 @@ describe("Showcase", () => {
 
     const track = screen.getByRole("group", { name: "1 de 3" }).parentElement as HTMLElement;
     Object.defineProperty(track, "clientWidth", { configurable: true, value: 300 });
+    // jsdom no mide: cada diapositiva ocupa el ancho del riel, una tras otra.
+    [1, 2, 3].forEach((n) => {
+      const slide = screen.getByRole("group", { name: `${n} de 3` });
+      Object.defineProperty(slide, "offsetLeft", { configurable: true, value: (n - 1) * 300 });
+      Object.defineProperty(slide, "clientWidth", { configurable: true, value: 300 });
+    });
     track.scrollLeft = 600;
     fireEvent.scroll(track);
     act(() => vi.advanceTimersByTime(200));
 
-    expect(screen.getByRole("button", { name: "Ir al destacado 3" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("button", { name: "Ir a Aceite de barba" })).toHaveAttribute("aria-current", "true");
   });
 
   it("muestra el eyebrow 'Destacado · N/M' en cada diapositiva", () => {
@@ -294,10 +303,10 @@ describe("Showcase", () => {
     const user = userEvent.setup();
     render(<Showcase products={[p1, p2, p3]} />);
 
-    await user.click(screen.getByRole("button", { name: "Ir al destacado 3" }));
+    await user.click(screen.getByRole("button", { name: "Ir a Aceite de barba" }));
     expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: "auto" }));
     await user.click(screen.getByRole("button", { name: "Destacado siguiente" }));
-    expect(screen.getByRole("button", { name: "Ir al destacado 1" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("button", { name: "Ir a Noche de Cuero" })).toHaveAttribute("aria-current", "true");
     expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: "auto" }));
     await user.click(screen.getByRole("button", { name: "Destacado siguiente" }));
     expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: "smooth" }));
@@ -320,11 +329,11 @@ describe("Showcase", () => {
   it("si la lista se achica, la diapositiva activa queda dentro del rango", async () => {
     const user = userEvent.setup();
     const { rerender } = render(<Showcase products={[p1, p2, p3, soldOutNoPhoto]} />);
-    await user.click(screen.getByRole("button", { name: "Ir al destacado 4" }));
+    await user.click(screen.getByRole("button", { name: "Ir a Oud Reserva" }));
 
     rerender(<Showcase products={[p1, p2]} />);
     expect(activeSlide()).toHaveAccessibleName("2 de 2");
-    expect(screen.getByRole("button", { name: "Ir al destacado 2" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("button", { name: "Ir a Bleu" })).toHaveAttribute("aria-current", "true");
   });
 
   describe("auto-avance", () => {
@@ -382,8 +391,10 @@ describe("Showcase", () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<Showcase products={[p1, p2, p3]} />);
       const track = screen.getByRole("group", { name: "1 de 3" }).parentElement as HTMLElement;
+      const names = ["Noche de Cuero", "Bleu", "Aceite de barba"];
+      // Barra (móvil) y miniatura (desktop) comparten el mismo estado de progreso.
       const fill = (n: number) =>
-        screen.getByRole("button", { name: `Ir al destacado ${n}` }).querySelector("[data-progress]");
+        screen.getByRole("button", { name: `Ir a ${names[n - 1]}` }).querySelector("[data-progress]");
 
       expect(track).toHaveAttribute("aria-live", "off");
       expect(fill(1)).toHaveAttribute("data-progress", "running");
@@ -419,7 +430,7 @@ describe("Showcase", () => {
       expect(activeSlide()).toHaveAccessibleName("1 de 3");
       // Sin rotación, la barra activa queda llena (no corre).
       expect(
-        screen.getByRole("button", { name: "Ir al destacado 1" }).querySelector("[data-progress]"),
+        screen.getByRole("button", { name: "Ir a Noche de Cuero" }).querySelector("[data-progress]"),
       ).toHaveAttribute("data-progress", "full");
 
       viewport.inView = true;

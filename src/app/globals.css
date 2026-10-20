@@ -166,6 +166,96 @@ body {
   animation: showcase-float 7s ease-in-out infinite;
 }
 
+/*
+ * Ambiente por tono: toda la vitrina se tiñe apenas con el color del destacado activo (--glow lo
+ * escribe Showcase en la sección) y cruza en 600 ms al cambiar. Es un tinte de muy baja saturación
+ * (7 % en claro, 9 % en oscuro): text-muted sigue en ≥4.5:1 sobre él. En desktop se suma un velo
+ * radial del lado de la foto que se apaga antes de la columna de texto (Ruling R3 se mantiene: el
+ * color saturado sigue sin tocar el texto).
+ */
+.showcase-ambient {
+  background-color: color-mix(in oklab, var(--glow) 7%, var(--surface));
+  transition: background-color 600ms ease-out;
+}
+
+.dark .showcase-ambient {
+  background-color: color-mix(in oklab, var(--glow) 9%, var(--surface));
+}
+
+@media (min-width: 768px) {
+  .showcase-ambient::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    /* Debajo del contenido de la sección (que es su propio contexto de apilamiento: isolate). */
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(
+      55% 90% at 78% 50%,
+      color-mix(in oklab, var(--glow) 12%, transparent),
+      transparent 70%
+    );
+  }
+}
+
+/*
+ * Miniaturas de navegación (desktop): anillo de progreso que rodea la miniatura activa y se completa
+ * en los 6 s del auto-avance (misma técnica de propiedad registrada que el borde de luz). Con la
+ * rotación detenida el anillo queda completo; en las inactivas no hay anillo.
+ */
+@property --ring {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes showcase-ring {
+  to {
+    --ring: 360deg;
+  }
+}
+
+.showcase-ring::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  padding: 2px;
+  pointer-events: none;
+  background: conic-gradient(var(--fg) var(--ring), transparent 0);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.showcase-ring[data-progress="running"]::before {
+  animation: showcase-ring 6s linear both;
+}
+
+.showcase-ring[data-progress="full"]::before {
+  --ring: 360deg;
+}
+
+/*
+ * El texto entra con cada destacado: eyebrow, nombre, etiquetas, nota, precio y botones suben 10 px
+ * y aparecen en cascada (45 ms entre uno y otro) cuando la diapositiva pasa a activa. La animación
+ * arranca cada vez que la regla vuelve a aplicar (data-active), sin volver a montar nada. Con
+ * reduced-motion la regla global la deja instantánea.
+ */
+@keyframes showcase-text-in {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+}
+
+.showcase-copy[data-active="true"] > * {
+  animation: showcase-text-in 400ms ease-out both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
 .showcase-breathe {
   animation: showcase-breathe 6s ease-in-out infinite;
 }
