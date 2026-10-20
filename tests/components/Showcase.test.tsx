@@ -245,6 +245,24 @@ describe("Showcase", () => {
     ).toBeTruthy();
   });
 
+  it("la bruma de fragancia es un solo canvas, en la diapositiva activa, y se muda con ella", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<Showcase products={[p1, p2, p3]} />);
+    expect(container.querySelectorAll("canvas")).toHaveLength(1);
+    expect(activeSlide()).toContainElement(container.querySelector("canvas"));
+
+    await user.click(screen.getByRole("button", { name: "Destacado siguiente" }));
+    expect(container.querySelectorAll("canvas")).toHaveLength(1);
+    expect(activeSlide()).toHaveAccessibleName("2 de 3");
+    expect(activeSlide()).toContainElement(container.querySelector("canvas"));
+  });
+
+  it("con reduced motion no hay bruma", () => {
+    mockReducedMotion(true);
+    const { container } = render(<Showcase products={[p1, p2, p3]} />);
+    expect(container.querySelector("canvas")).toBeNull();
+  });
+
   it("los saltos de más de una diapositiva (y la vuelta circular) no desplazan con animación", async () => {
     const user = userEvent.setup();
     render(<Showcase products={[p1, p2, p3]} />);

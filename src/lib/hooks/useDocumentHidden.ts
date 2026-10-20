@@ -1,0 +1,11 @@
+import { useSyncExternalStore } from "react";
+
+function subscribe(onChange: () => void) {
+  document.addEventListener("visibilitychange", onChange);
+  return () => document.removeEventListener("visibilitychange", onChange);
+}
+
+/** `true` mientras la pestaña está oculta; sigue los cambios en vivo. En el servidor, `false`. */
+export function useDocumentHidden() {
+  return useSyncExternalStore(subscribe, () => document.hidden, () => false);
+}
