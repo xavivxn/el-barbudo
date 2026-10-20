@@ -22,8 +22,6 @@ vi.mock("@/components/shop/Header", () => ({ Header: () => <header>cabecera</hea
 vi.mock("@/components/shop/Footer", () => ({ Footer: () => <footer>pie</footer> }));
 vi.mock("@/components/shop/CartDrawer", () => ({ CartDrawer: () => null }));
 
-const BANNER = "Tienda de demostración · productos, precios y WhatsApp de ejemplo";
-
 async function withDemo(value: "true" | "false") {
   vi.resetModules();
   vi.stubEnv("DEMO_MODE", value);
@@ -119,29 +117,17 @@ describe("layout del admin", () => {
   });
 });
 
-describe("franja de la demo en la tienda", () => {
+describe("tienda en modo demo", () => {
   async function renderShell(children: ReactNode = <p>vitrina</p>) {
     const { ShopShell } = await import("@/components/shop/ShopShell");
     render(<ShopShell>{children}</ShopShell>);
   }
 
-  it("en modo demo aparece arriba de la cabecera, como texto común (no una alerta)", async () => {
-    await withDemo("true");
+  it.each(["true", "false"] as const)("con DEMO_MODE=%s no muestra ninguna franja de demostración", async (value) => {
+    await withDemo(value);
     await renderShell();
-    const banner = screen.getByText(BANNER);
-    expect(banner.tagName).toBe("DIV");
-    expect(banner).not.toHaveAttribute("role");
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    // Va antes de la cabecera en el documento.
-    const header = screen.getByText("cabecera");
-    expect(banner.compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText("vitrina")).toBeInTheDocument();
-  });
-
-  it("fuera de la demo no aparece", async () => {
-    await withDemo("false");
-    await renderShell();
-    expect(screen.queryByText(BANNER)).not.toBeInTheDocument();
+    expect(screen.queryByText(/tienda de demostración/i)).not.toBeInTheDocument();
+    expect(screen.getByText("cabecera")).toBeInTheDocument();
     expect(screen.getByText("vitrina")).toBeInTheDocument();
   });
 });

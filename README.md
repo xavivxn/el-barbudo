@@ -44,7 +44,7 @@ Sin `DEMO_MODE=false`, el sitio corre como **demo**: está prendido por defecto,
 
 - La tienda lee el catálogo de ejemplo de `src/lib/catalog-data.ts` en memoria (el mismo que carga el seed): no usa la base y no necesita `DATABASE_URL`.
 - El panel `/admin` (login incluido) muestra un aviso de que está deshabilitado, y sus acciones no escriben nada.
-- Arriba de la tienda aparece una franja que avisa que productos, precios y WhatsApp son de ejemplo. Sin `NEXT_PUBLIC_WHATSAPP_NUMBER`, los pedidos van al número marcador de `src/site.ts`.
+- La tienda se ve igual que la real, sin avisos. Sin `NEXT_PUBLIC_WHATSAPP_NUMBER`, los pedidos van al número marcador de `src/site.ts`.
 - El build no comprueba las variables de producción.
 
 Para la tienda real: `DEMO_MODE=false` más las 4 variables de arriba (`DATABASE_URL`, `ADMIN_PASSWORD`, `SESSION_SECRET` y `NEXT_PUBLIC_WHATSAPP_NUMBER`). Definila también para el build: la página de login del admin y el 404 se generan en el build con el modo que haya en ese momento.
