@@ -1,19 +1,8 @@
 "use client";
 
 import { ShoppingBag } from "lucide-react";
-import { useSyncExternalStore } from "react";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 import { cartCount, useCart } from "@/stores/cart";
-
-const noopSubscribe = () => () => {};
-
-/** `false` en el servidor y en la hidratación; `true` después. Evita el desajuste con localStorage. */
-function useHydrated() {
-  return useSyncExternalStore(
-    noopSubscribe,
-    () => true,
-    () => false,
-  );
-}
 
 export function CartButton({ className = "" }: { className?: string }) {
   const hydrated = useHydrated();

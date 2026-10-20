@@ -2,11 +2,12 @@
 
 import { Minus, Plus, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { refreshCart } from "@/app/(shop)/actions";
 import { Button } from "@/components/ui/Button";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 import { formatPYG } from "@/lib/money";
 import { buildOrderMessage, whatsappUrl } from "@/lib/whatsapp";
 import { type CartItem, cartTotal, toOrderLines, useCart } from "@/stores/cart";
@@ -18,17 +19,6 @@ const focusRing =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 const stepButton = `inline-flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-200 hover:bg-surface aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent ${focusRing}`;
-
-const noopSubscribe = () => () => {};
-
-/** `false` en el servidor y en la hidratación; `true` después. Evita el desajuste con localStorage. */
-function useHydrated() {
-  return useSyncExternalStore(
-    noopSubscribe,
-    () => true,
-    () => false,
-  );
-}
 
 function unique(names: string[]): string {
   return [...new Set(names)].join(", ");

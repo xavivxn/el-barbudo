@@ -10,7 +10,6 @@ import {
 import {
   armMorph,
   getMorph,
-  getServerMorph,
   isMorphNamed,
   morphName,
   releaseMorph,
@@ -33,8 +32,13 @@ function navigatesHere(event: MouseEvent | PointerEvent) {
  */
 export function useProductMorph(slug: string) {
   const id = useId();
-  const arm = useSyncExternalStore(subscribeMorph, getMorph, getServerMorph);
-  const named = isMorphNamed(arm, id, slug);
+  // Cada instancia se suscribe a "¿llevo yo el nombre?" (un booleano), no al estado entero: armar una
+  // tarjeta re-renderiza solo esa y la que lo suelta, no todas las de la página.
+  const named = useSyncExternalStore(
+    subscribeMorph,
+    () => isMorphNamed(getMorph(), id, slug),
+    () => false,
+  );
 
   const [wasNamed, setWasNamed] = useState(named);
   const [generation, setGeneration] = useState(0);

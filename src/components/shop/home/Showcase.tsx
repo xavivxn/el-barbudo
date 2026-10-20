@@ -12,7 +12,6 @@ import {
   useId,
   useRef,
   useState,
-  useSyncExternalStore,
   ViewTransition,
 } from "react";
 import { flushSync } from "react-dom";
@@ -23,6 +22,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { useDocumentHidden } from "@/lib/hooks/useDocumentHidden";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 import { usePrefersReducedMotion } from "@/lib/hooks/usePrefersReducedMotion";
 import { useProductMorph } from "@/lib/hooks/useProductMorph";
 import { cardPricing } from "@/lib/pricing";
@@ -52,13 +52,6 @@ const PROGRESS_CLASS: Record<Progress, string> = {
   full: "scale-x-100",
   empty: "scale-x-0",
 };
-
-const subscribeNothing = () => () => {};
-
-/** `false` en el HTML del servidor y durante la hidratación; `true` una vez que hay JS. */
-function useHydrated() {
-  return useSyncExternalStore(subscribeNothing, () => true, () => false);
-}
 
 type ShowcaseProps = {
   /** La salida de `pickShowcase`. */

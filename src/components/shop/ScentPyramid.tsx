@@ -1,7 +1,8 @@
 "use client";
 
 import { motion, type Variants } from "motion/react";
-import { type CSSProperties, useId, useSyncExternalStore } from "react";
+import { type CSSProperties, useId } from "react";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 import { usePrefersReducedMotion } from "@/lib/hooks/usePrefersReducedMotion";
 import type { Tone } from "@/lib/tone";
 import type { Notes } from "@/lib/types";
@@ -48,8 +49,6 @@ const layerVariants: Variants = {
   }),
 };
 
-const subscribeNothing = () => () => {};
-
 /**
  * Pirámide olfativa: salida, corazón y fondo como tres barras que se ensanchan hacia la base.
  *
@@ -64,7 +63,7 @@ export function ScentPyramid({ notes, glow }: ScentPyramidProps) {
   const headingId = useId();
   const reducedMotion = usePrefersReducedMotion();
   // `false` en el servidor y al hidratar; `true` justo después, en un render síncrono previo al pintado.
-  const mounted = useSyncExternalStore(subscribeNothing, () => true, () => false);
+  const mounted = useHydrated();
 
   if (!notes) return null;
   const armed = mounted && !reducedMotion;

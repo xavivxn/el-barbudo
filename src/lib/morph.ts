@@ -46,10 +46,6 @@ export function getMorph() {
   return arm;
 }
 
-export function getServerMorph(): MorphArm | null {
-  return null;
-}
-
 /** El usuario activó esta instancia: pasa a ser la única con nombre. */
 export function armMorph(slug: string, owner: string) {
   if (arm?.owner === owner && arm.slug === slug) return;
