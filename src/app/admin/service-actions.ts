@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getPrisma } from "@/lib/db-lazy";
 import { fieldErrors, parseServiceForm, serviceSchema } from "@/lib/validation";
 import type { FormState } from "./actions";
 
@@ -26,6 +26,7 @@ export async function saveService(_prev: FormState, formData: FormData): Promise
 
   const rawId = formData.get("id");
   const id = typeof rawId === "string" && rawId ? rawId : null;
+  const prisma = await getPrisma();
 
   try {
     if (id) {
@@ -56,6 +57,7 @@ export async function deleteService(id: string): Promise<void> {
   await requireAdmin();
   if (typeof id !== "string" || !id) return;
 
+  const prisma = await getPrisma();
   await prisma.service.deleteMany({ where: { id } });
   revalidateAll();
 }
@@ -69,6 +71,7 @@ export async function moveService(id: string, direction: "up" | "down"): Promise
   await requireAdmin();
   if (typeof id !== "string" || !id || (direction !== "up" && direction !== "down")) return;
 
+  const prisma = await getPrisma();
   await prisma.$transaction(async (tx) => {
     const current = await tx.service.findMany({
       orderBy: [{ order: "asc" }, { id: "asc" }],

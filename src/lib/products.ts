@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/db";
+import { getPrisma } from "@/lib/db-lazy";
+import { DEMO_MODE } from "@/lib/demo";
 import {
   CATEGORIES,
   type Category,
@@ -14,7 +15,7 @@ type VariantRow = {
   stock: number;
 };
 
-type ProductRow = {
+export type ProductRow = {
   id: string;
   slug: string;
   name: string;
@@ -105,6 +106,36 @@ export function pickRelated(
   return [...sameCategory, ...sharedTag].slice(0, limit);
 }
 
+/**
+ * Lista de etiquetas sin repetir, en orden alfabético en español. La usan la base y la demo.
+ */
+export function uniqueSortedTags(tagLists: string[][]): string[] {
+  const set = new Set<string>();
+  for (const tags of tagLists) for (const t of tags) set.add(t);
+  return [...set].sort((a, b) => a.localeCompare(b, "es"));
+}
+
+/** Foto principal y tamaño como los muestra el carrito. La usan la base y la demo. */
+export function toVariantSnapshot(
+  variant: VariantRow,
+  product: { active: boolean; name: string; slug: string; images: string[]; variantCount: number },
+): VariantSnapshot {
+  return {
+    id: variant.id,
+    price: variant.price,
+    stock: variant.stock,
+    available: product.active,
+    name: product.name,
+    slug: product.slug,
+    image: product.images[0] ?? null,
+    // Igual que la ficha al agregar: el tamaño solo se nombra si hay más de uno.
+    variantLabel: product.variantCount > 1 ? variant.label : null,
+  };
+}
+
+/** Los datos de la demo también se cargan solo al usarlos (y así no hay ciclo de imports). */
+const demo = () => import("@/lib/demo-store");
+
 const include = { variants: { orderBy: { price: "asc" as const } } };
 
 export async function listProducts(
@@ -115,6 +146,8 @@ export async function listProducts(
     includeInactive?: boolean;
   } = {},
 ): Promise<ProductDTO[]> {
+  if (DEMO_MODE) return (await demo()).listProducts(opts);
+  const prisma = await getPrisma();
   const rows = await prisma.product.findMany({
     where: {
       ...(opts.includeInactive ? {} : { active: true }),
@@ -130,6 +163,8 @@ export async function listProducts(
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductDTO | null> {
+  if (DEMO_MODE) return (await demo()).getProductBySlug(slug);
+  const prisma = await getPrisma();
   const row = await prisma.product.findUnique({ where: { slug }, include });
   if (!row || !row.active) return null;
   return toProductDTO(row);
@@ -137,24 +172,28 @@ export async function getProductBySlug(slug: string): Promise<ProductDTO | null>
 
 /** Incluye inactivos (para el admin). */
 export async function getProductById(id: string): Promise<ProductDTO | null> {
+  if (DEMO_MODE) return (await demo()).getProductById(id);
+  const prisma = await getPrisma();
   const row = await prisma.product.findUnique({ where: { id }, include });
   return row ? toProductDTO(row) : null;
 }
 
 export async function listTags(): Promise<string[]> {
+  if (DEMO_MODE) return (await demo()).listTags();
+  const prisma = await getPrisma();
   const rows = await prisma.product.findMany({
     where: { active: true },
     select: { tags: true },
   });
-  const set = new Set<string>();
-  for (const r of rows) for (const t of parseStringArray(r.tags)) set.add(t);
-  return [...set].sort((a, b) => a.localeCompare(b, "es"));
+  return uniqueSortedTags(rows.map((r) => parseStringArray(r.tags)));
 }
 
 export async function getVariantSnapshots(
   ids: string[],
 ): Promise<VariantSnapshot[]> {
+  if (DEMO_MODE) return (await demo()).getVariantSnapshots(ids);
   if (ids.length === 0) return [];
+  const prisma = await getPrisma();
   const rows = await prisma.variant.findMany({
     where: { id: { in: ids } },
     include: {
@@ -163,15 +202,13 @@ export async function getVariantSnapshots(
       },
     },
   });
-  return rows.map((v) => ({
-    id: v.id,
-    price: v.price,
-    stock: v.stock,
-    available: v.product.active,
-    name: v.product.name,
-    slug: v.product.slug,
-    image: parseStringArray(v.product.images)[0] ?? null,
-    // Igual que la ficha al agregar: el tamaño solo se nombra si hay más de uno.
-    variantLabel: v.product._count.variants > 1 ? v.label : null,
-  }));
+  return rows.map((v) =>
+    toVariantSnapshot(v, {
+      active: v.product.active,
+      name: v.product.name,
+      slug: v.product.slug,
+      images: parseStringArray(v.product.images),
+      variantCount: v.product._count.variants,
+    }),
+  );
 }

@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { getIronSession, type IronSession, type SessionOptions } from "iron-session";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { DEMO_MODE } from "@/lib/demo";
 
 export type SessionData = { isAdmin?: boolean };
 
@@ -70,8 +71,13 @@ export async function getSession(): Promise<IronSession<SessionData>> {
   return getIronSession<SessionData>(await cookies(), sessionOptions());
 }
 
-/** Redirige al login si no hay sesión de admin. Llamar al inicio de layouts y Server Actions del panel. */
+/**
+ * Redirige al login si no hay sesión de admin. Llamar al inicio de layouts y Server Actions del panel.
+ * En modo demo el panel está apagado: redirige al aviso de `/admin` antes de mirar la sesión o las
+ * variables, así ninguna Server Action del admin escribe nada.
+ */
 export async function requireAdmin(): Promise<void> {
+  if (DEMO_MODE) redirect("/admin");
   const session = await getSession();
   if (!session.isAdmin) redirect("/admin/login");
 }

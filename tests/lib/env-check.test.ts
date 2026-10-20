@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { assertProductionEnv, PLACEHOLDER_WHATSAPP_NUMBER, shouldCheckProductionEnv } from "@/lib/env-check";
+import {
+  assertProductionEnv,
+  isDemoMode,
+  PLACEHOLDER_WHATSAPP_NUMBER,
+  shouldCheckProductionEnv,
+} from "@/lib/env-check";
 import { site } from "@/site";
 
 const valid = {
@@ -70,12 +75,39 @@ describe("assertProductionEnv", () => {
 });
 
 describe("shouldCheckProductionEnv", () => {
-  it("solo en el deploy de producción de Vercel o con CHECK_PROD_ENV=1", () => {
-    expect(shouldCheckProductionEnv({ VERCEL_ENV: "production" })).toBe(true);
-    expect(shouldCheckProductionEnv({ CHECK_PROD_ENV: "1" })).toBe(true);
-    expect(shouldCheckProductionEnv({ VERCEL_ENV: "preview" })).toBe(false);
-    expect(shouldCheckProductionEnv({ NODE_ENV: "production" })).toBe(false);
-    expect(shouldCheckProductionEnv({})).toBe(false);
+  const real = { DEMO_MODE: "false" };
+
+  it("con la tienda real, solo en el deploy de producción de Vercel o con CHECK_PROD_ENV=1", () => {
+    expect(shouldCheckProductionEnv({ ...real, VERCEL_ENV: "production" })).toBe(true);
+    expect(shouldCheckProductionEnv({ ...real, CHECK_PROD_ENV: "1" })).toBe(true);
+    expect(shouldCheckProductionEnv({ ...real, VERCEL_ENV: "preview" })).toBe(false);
+    expect(shouldCheckProductionEnv({ ...real, NODE_ENV: "production" })).toBe(false);
+    expect(shouldCheckProductionEnv(real)).toBe(false);
+  });
+
+  it("en modo demo nunca comprueba (un deploy de Vercel sin variables publica la demo)", () => {
+    expect(shouldCheckProductionEnv({ VERCEL_ENV: "production" })).toBe(false);
+    expect(shouldCheckProductionEnv({ CHECK_PROD_ENV: "1" })).toBe(false);
+    expect(shouldCheckProductionEnv({ DEMO_MODE: "true", VERCEL_ENV: "production", CHECK_PROD_ENV: "1" })).toBe(false);
+  });
+});
+
+describe("isDemoMode", () => {
+  it("está prendido por defecto", () => {
+    expect(isDemoMode({})).toBe(true);
+    expect(isDemoMode({ DEMO_MODE: "" })).toBe(true);
+  });
+
+  it.each(["false", "FALSE", " false ", "False\n"])("DEMO_MODE=%j lo apaga", (value) => {
+    expect(isDemoMode({ DEMO_MODE: value })).toBe(false);
+  });
+
+  it.each(["true", "1", "no", "0"])("cualquier otro valor (%j) lo deja prendido", (value) => {
+    expect(isDemoMode({ DEMO_MODE: value })).toBe(true);
+  });
+
+  it(".env.example arranca la tienda real", () => {
+    expect(readFileSync(".env.example", "utf8")).toContain('DEMO_MODE="false"');
   });
 });
 

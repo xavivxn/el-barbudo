@@ -13,8 +13,20 @@ export const PLACEHOLDER_WHATSAPP_NUMBER = "595000000000";
 
 type Env = Record<string, string | undefined>;
 
-/** Solo en el deploy de producción de Vercel o si se pide a mano: `npm run build` local sigue funcionando. */
+/**
+ * Modo demo: la tienda funciona sin base, sin admin y sin variables de entorno (lo que pasa en un
+ * deploy de Vercel sin configurar). Está prendido por defecto; solo `DEMO_MODE=false` lo apaga.
+ */
+export function isDemoMode(env: Env): boolean {
+  return env.DEMO_MODE?.trim().toLowerCase() !== "false";
+}
+
+/**
+ * Solo en el deploy de producción de Vercel o si se pide a mano: `npm run build` local sigue funcionando.
+ * En modo demo no se comprueba nada: la demo no necesita ninguna variable.
+ */
 export function shouldCheckProductionEnv(env: Env): boolean {
+  if (isDemoMode(env)) return false;
   return env.VERCEL_ENV === "production" || env.CHECK_PROD_ENV === "1";
 }
 

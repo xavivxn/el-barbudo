@@ -11,5 +11,7 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.test.{ts,tsx}"],
+    // Las pruebas usan la tienda real (base, admin) salvo las del modo demo, que lo prenden a mano.
+    env: { DEMO_MODE: "false" },
   },
 });

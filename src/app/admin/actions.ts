@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { parsePrice, parseStock, PRICE_ERROR, STOCK_ERROR } from "@/lib/admin-messages";
 import { requireAdmin } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getPrisma } from "@/lib/db-lazy";
 import {
   fieldErrors,
   parseProductForm,
@@ -57,6 +57,8 @@ export async function updateVariant(
   }
   if (Object.keys(update).length === 0) return { ok: true };
 
+  const prisma = await getPrisma();
+
   try {
     await prisma.variant.update({ where: { id: variantId }, data: update });
   } catch (error) {
@@ -72,6 +74,7 @@ export async function markSoldOut(productId: string): Promise<{ ok: true } | { e
   await requireAdmin();
   if (typeof productId !== "string" || !productId) return { error: "No encontramos este producto. Recargá la página." };
 
+  const prisma = await getPrisma();
   await prisma.variant.updateMany({ where: { productId }, data: { stock: 0 } });
   revalidateAll();
   return { ok: true };
@@ -91,6 +94,7 @@ export async function toggleProductFlag(
     return;
   }
 
+  const prisma = await getPrisma();
   await prisma.product.updateMany({ where: { id }, data: { [flag]: value } });
   revalidateAll();
 }
@@ -114,6 +118,7 @@ function productData(input: ProductInput) {
 type VariantInput = ProductInput["variants"][number];
 
 async function createProduct(input: ProductInput) {
+  const prisma = await getPrisma();
   await prisma.product.create({
     data: {
       ...productData(input),
@@ -133,6 +138,7 @@ async function createProduct(input: ProductInput) {
  * formulario tenía cargadas.
  */
 async function updateProduct(productId: string, input: ProductInput) {
+  const prisma = await getPrisma();
   await prisma.$transaction(async (tx) => {
     const existing = await tx.product.findUnique({
       where: { id: productId },
